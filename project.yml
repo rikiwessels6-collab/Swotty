@@ -1,0 +1,83 @@
+# XcodeGen project definition. Generate the Xcode project on a Mac with:
+#   brew install xcodegen && xcodegen generate
+# then open Swotty.xcodeproj.
+name: Swotty
+
+options:
+  bundleIdPrefix: com.boundaryline
+  deploymentTarget:
+    iOS: "16.1"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    # The live App Store version is 1.0, so this update is 1.1.
+    MARKETING_VERSION: "1.1"
+    CURRENT_PROJECT_VERSION: "1"
+    # Set your Apple Developer Team ID here (Membership page in developer.apple.com)
+    # DEVELOPMENT_TEAM: XXXXXXXXXX
+
+targets:
+  Swotty:
+    type: application
+    platform: iOS
+    sources:
+      - path: Swotty
+    settings:
+      base:
+        # TODO: replace with the bundle ID registered in
+        # Certificates, Identifiers & Profiles.
+        PRODUCT_BUNDLE_IDENTIFIER: com.boundaryline.swotty
+        PRODUCT_NAME: Swotty
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Swotty/Resources/Info.plist
+    info:
+      path: Swotty/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Swotty
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # Required for Calendar sync (iOS 17+ and earlier). Without these
+        # the app crashes when it asks for access.
+        NSCalendarsFullAccessUsageDescription: >-
+          Swotty adds your assessment due dates to a Swotty calendar so you
+          can see them in the Calendar app.
+        NSCalendarsUsageDescription: >-
+          Swotty adds your assessment due dates to a Swotty calendar so you
+          can see them in the Calendar app.
+        ITSAppUsesNonExemptEncryption: false
+
+  SwottyTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: SwottyTests
+    dependencies:
+      - target: Swotty
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.boundaryline.swotty.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Swotty:
+    build:
+      targets:
+        Swotty: all
+    test:
+      targets:
+        - SwottyTests
