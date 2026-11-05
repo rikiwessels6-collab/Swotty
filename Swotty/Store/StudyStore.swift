@@ -10,11 +10,17 @@ final class StudyStore: ObservableObject {
     }
 
     @Published var lessons: [Lesson] = [] {
-        didSet { save(lessons, key: lessonsKey) }
+        didSet {
+            save(lessons, key: lessonsKey)
+            ClassReminders.rescheduleLessons(lessons, subjects: subjects)
+        }
     }
 
     @Published var notes: [ClassNote] = [] {
-        didSet { save(notes, key: notesKey) }
+        didSet {
+            save(notes, key: notesKey)
+            ClassReminders.rescheduleReview(pendingCount: pendingReviewNotes.count)
+        }
     }
 
     private let itemsKey = "studyPlanner.items"
@@ -40,6 +46,7 @@ final class StudyStore: ObservableObject {
             subjects.append(Subject.fallback)
         }
         upgradeSubjectsIfNeeded()
+        refreshClassReminders()
     }
 
     // Runs once to bring older saved subjects up to date
@@ -125,6 +132,13 @@ final class StudyStore: ObservableObject {
 
     func rescheduleAllReminders() {
         items.forEach { ReminderScheduler.schedule($0, subject: subject(for: $0)) }
+        ClassReminders.rescheduleReview(pendingCount: pendingReviewNotes.count)
+    }
+
+    // Re-plans class and review reminders (after a Settings change).
+    func refreshClassReminders() {
+        ClassReminders.rescheduleLessons(lessons, subjects: subjects)
+        ClassReminders.rescheduleReview(pendingCount: pendingReviewNotes.count)
     }
 
     // ---- Calendar ----
@@ -167,6 +181,7 @@ final class StudyStore: ObservableObject {
         subjects[i] = subject
         // Names may have changed, so refresh reminders and events.
         items.filter { $0.subjectID == subject.id }.forEach { refreshExtras(for: $0.id) }
+        ClassReminders.rescheduleLessons(lessons, subjects: subjects)
     }
 
     func deleteSubject(_ subject: Subject) {

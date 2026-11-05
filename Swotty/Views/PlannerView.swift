@@ -17,6 +17,13 @@ struct PlannerView: View {
 
     // Starts as "authorized" so the card never flashes before we know.
     @State private var notificationStatus: UNAuthorizationStatus = .authorized
+    @State private var showingReview = false
+
+    // Show today's class and review shortcut only when there's something to show.
+    private var showTodayCard: Bool {
+        let weekday = Calendar.current.component(.weekday, from: Date())
+        return !store.lessons(on: weekday).isEmpty || !store.pendingReviewNotes.isEmpty
+    }
 
     private var showNotificationNudge: Bool {
         !nudgeDismissed && (notificationStatus == .notDetermined || notificationStatus == .denied)
@@ -104,6 +111,14 @@ struct PlannerView: View {
                     .listRowInsets(EdgeInsets())
                 }
 
+                if showTodayCard {
+                    Section {
+                        TodayCard(onShowReview: { showingReview = true })
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                }
+
                 Section {
                     VStack(alignment: .leading, spacing: 14) {
                         VStack(alignment: .leading, spacing: 4) {
@@ -174,6 +189,10 @@ struct PlannerView: View {
             }
             .listStyle(.insetGrouped)
             .task { await refreshNotificationStatus() }
+            .sheet(isPresented: $showingReview) {
+                ReviewNotesView()
+                    .environmentObject(store)
+            }
             .navigationTitle("Planner")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
