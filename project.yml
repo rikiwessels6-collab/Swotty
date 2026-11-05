@@ -12,8 +12,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    # The live App Store version is 1.0, so this update is 1.1.
-    MARKETING_VERSION: "1.1"
+    # Apple reports 1.5 as the latest approved version, so this update is 1.6.
+    MARKETING_VERSION: "1.6"
     CURRENT_PROJECT_VERSION: "1"
     # Set your Apple Developer Team ID here (Membership page in developer.apple.com)
     # DEVELOPMENT_TEAM: XXXXXXXXXX

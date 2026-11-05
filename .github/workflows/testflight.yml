@@ -32,6 +32,32 @@ jobs:
             echo "::error::Missing secret ASC_KEY_P8 (see docs/TESTFLIGHT.md)"; exit 1
           fi
 
+      # Apple only accepts uploads built with Xcode 26 or newer.
+      - name: Select Xcode 26 or newer
+        run: |
+          XCODE_APP="$(python3 - <<'PY'
+          import glob, re
+          best = None
+          for path in glob.glob('/Applications/Xcode*.app'):
+              if 'beta' in path.lower():
+                  continue
+              m = re.search(r'Xcode[_-]?(\d+(?:\.\d+)*)', path)
+              if not m:
+                  continue
+              version = tuple(int(x) for x in m.group(1).split('.'))
+              if version[0] >= 26 and (best is None or version > best[0]):
+                  best = (version, path)
+          print(best[1] if best else '')
+          PY
+          )"
+          if [ -z "$XCODE_APP" ]; then
+            echo "::error::No Xcode 26 or newer on this runner. Installed versions:"
+            ls -d /Applications/Xcode*.app
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE_APP"
+          xcodebuild -version
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
