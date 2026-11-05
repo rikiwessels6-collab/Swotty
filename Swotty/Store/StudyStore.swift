@@ -182,11 +182,44 @@ final class StudyStore: ObservableObject {
 
     // ---- Results ----
     func averagePercentage(subjectID: String? = nil) -> Double? {
-        let marks = items
+        items
             .filter { subjectID == nil || $0.subjectID == subjectID }
-            .compactMap { $0.percentage }
-        guard !marks.isEmpty else { return nil }
-        return marks.reduce(0, +) / Double(marks.count)
+            .weightedAveragePercentage
+    }
+
+    // ---- Backup ----
+    func makeBackup() -> BackupFile {
+        BackupFile(version: BackupFile.currentVersion,
+                   exportedAt: Date(),
+                   studentName: UserDefaults.standard.string(forKey: "studentName") ?? "",
+                   subjects: subjects,
+                   items: items,
+                   lessons: lessons)
+    }
+
+    // Replaces everything with the backup's contents.
+    func restore(from backup: BackupFile) {
+        // Clear out the current reminders and calendar events first.
+        items.forEach { ReminderScheduler.cancel($0) }
+        removeAllFromCalendar()
+
+        var restoredSubjects = backup.subjects.isEmpty ? Subject.defaults : backup.subjects
+        if !restoredSubjects.contains(where: { $0.id == Subject.otherID }) {
+            restoredSubjects.append(Subject.fallback)
+        }
+        subjects = restoredSubjects
+        lessons = backup.lessons
+        items = backup.items.map { item in
+            var item = item
+            item.calendarEventID = nil   // events are recreated below if sync is on
+            return item
+        }
+        if !backup.studentName.isEmpty {
+            UserDefaults.standard.set(backup.studentName, forKey: "studentName")
+        }
+
+        rescheduleAllReminders()
+        syncAllToCalendar()
     }
 
     // ---- Timetable ----

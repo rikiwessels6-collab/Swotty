@@ -112,6 +112,8 @@ struct SettingsView: View {
                     Text("Adds each assessment as an all-day event in a \"\(appName)\" calendar in the Calendar app. Changes here update the calendar automatically.")
                 }
 
+                BackupSection()
+
                 if store.hasDemoData {
                     Section {
                         Button("Remove Demo Data", role: .destructive) {

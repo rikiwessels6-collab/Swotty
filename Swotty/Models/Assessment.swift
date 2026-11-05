@@ -54,6 +54,7 @@ struct Assessment: Identifiable, Codable, Equatable {
     var studyMinutes = 0                 // added by the Focus timer
     var calendarEventID: String? = nil   // link to the Calendar app event
     var isDemo = false                   // added by "Start with demo data"
+    var weight = 1.0                     // how much it counts towards the subject average
 
     init(title: String, type: AssessmentType, subjectID: String, dueDate: Date) {
         self.title = title
@@ -84,7 +85,7 @@ struct Assessment: Identifiable, Codable, Equatable {
     // tasks saved by the previous version still load.
     enum CodingKeys: String, CodingKey {
         case id, title, type, dueDate, notes, reminderDaysBefore, isCompleted
-        case steps, score, outOf, grade, studyMinutes, calendarEventID, isDemo
+        case steps, score, outOf, grade, studyMinutes, calendarEventID, isDemo, weight
         case subjectID = "subject"
     }
 
@@ -107,5 +108,21 @@ struct Assessment: Identifiable, Codable, Equatable {
         studyMinutes = try c.decodeIfPresent(Int.self, forKey: .studyMinutes) ?? 0
         calendarEventID = try c.decodeIfPresent(String.self, forKey: .calendarEventID)
         isDemo = try c.decodeIfPresent(Bool.self, forKey: .isDemo) ?? false
+        let savedWeight = try c.decodeIfPresent(Double.self, forKey: .weight) ?? 1.0
+        weight = savedWeight > 0 ? savedWeight : 1.0
+    }
+}
+
+extension Array where Element == Assessment {
+    // Average of all marked results, where a result with weight 2
+    // counts twice as much as one with weight 1. Nil if nothing is marked.
+    var weightedAveragePercentage: Double? {
+        let marked = compactMap { item -> (pct: Double, weight: Double)? in
+            guard let pct = item.percentage else { return nil }
+            return (pct, item.weight)
+        }
+        let totalWeight = marked.reduce(0) { $0 + $1.weight }
+        guard totalWeight > 0 else { return nil }
+        return marked.reduce(0) { $0 + $1.pct * $1.weight } / totalWeight
     }
 }

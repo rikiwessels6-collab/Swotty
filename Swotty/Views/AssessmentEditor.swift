@@ -186,13 +186,22 @@ struct AssessmentEditor: View {
                 LabeledContent("Percentage", value: "\(formatNumber(pct))%")
             }
 
+            HStack {
+                Text("Weight")
+                Spacer()
+                TextField("1", value: $draft.weight, format: .number)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: 70)
+            }
+
             if draft.studyMinutes > 0 {
                 LabeledContent("Time studied", value: formatMinutes(draft.studyMinutes))
             }
         } header: {
             Text("Result")
         } footer: {
-            Text("Add your mark or grade once it's been marked.")
+            Text("Add your mark or grade once it's been marked. Weight is how much it counts towards the subject average: 1 is normal, 2 counts double.")
         }
     }
 
@@ -206,6 +215,7 @@ struct AssessmentEditor: View {
 
     private func save() {
         draft.title = trimmedTitle
+        if draft.weight <= 0 { draft.weight = 1 }
         draft.reminderDaysBefore = remindMe ? daysBefore : nil
         draft.steps.removeAll { $0.text.trimmingCharacters(in: .whitespaces).isEmpty }
 
