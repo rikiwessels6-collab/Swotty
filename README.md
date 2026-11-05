@@ -7,7 +7,7 @@ run a Focus timer, and review results with charts.
 All data stays on the device (UserDefaults). No accounts, no tracking.
 
 Features: planner with steps and reminders, weekly timetable, month calendar,
-Calendar-app sync, Focus timer, weighted grades with per-subject averages and
+day-by-day class view with notes to review, Calendar-app sync, Focus timer, weighted grades with per-subject averages and
 charts, and backup/restore to a JSON file (Settings → Backup).
 
 ## Getting started (on a Mac)
@@ -38,7 +38,7 @@ TestFlight from GitHub Actions.
 | Path | What it holds |
 | --- | --- |
 | `Swotty/SwottyApp.swift` | App entry point, app name/version |
-| `Swotty/Models/` | `Subject`, `Assessment`, `Lesson` and option types |
+| `Swotty/Models/` | `Subject`, `Assessment`, `Lesson`, `ClassNote` and option types |
 | `Swotty/Store/StudyStore.swift` | All data, saved automatically |
 | `Swotty/Services/` | Reminders (notifications) and Calendar sync (EventKit) |
 | `Swotty/Views/` | One file per screen, plus shared components. Schedule tab = `TimetableView` + `MonthCalendarView`; `WelcomeView` holds first-launch onboarding and the notification nudge card |

@@ -11,8 +11,37 @@ struct BackupFile: Codable {
     var subjects: [Subject] = []
     var items: [Assessment] = []
     var lessons: [Lesson] = []
+    var notes: [ClassNote] = []
 
     static let currentVersion = 1
+
+    init(version: Int = BackupFile.currentVersion, exportedAt: Date = Date(),
+         studentName: String = "", subjects: [Subject] = [], items: [Assessment] = [],
+         lessons: [Lesson] = [], notes: [ClassNote] = []) {
+        self.version = version
+        self.exportedAt = exportedAt
+        self.studentName = studentName
+        self.subjects = subjects
+        self.items = items
+        self.lessons = lessons
+        self.notes = notes
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case version, exportedAt, studentName, subjects, items, lessons, notes
+    }
+
+    // Backups made before class notes existed have no "notes" entry.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        version = try c.decode(Int.self, forKey: .version)
+        exportedAt = try c.decodeIfPresent(Date.self, forKey: .exportedAt) ?? Date()
+        studentName = try c.decodeIfPresent(String.self, forKey: .studentName) ?? ""
+        subjects = try c.decodeIfPresent([Subject].self, forKey: .subjects) ?? []
+        items = try c.decodeIfPresent([Assessment].self, forKey: .items) ?? []
+        lessons = try c.decodeIfPresent([Lesson].self, forKey: .lessons) ?? []
+        notes = try c.decodeIfPresent([ClassNote].self, forKey: .notes) ?? []
+    }
 
     func encoded() throws -> Data {
         let encoder = JSONEncoder()
