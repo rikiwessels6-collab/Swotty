@@ -9,12 +9,20 @@ final class StudyStore: ObservableObject {
         didSet { save(subjects, key: subjectsKey) }
     }
 
+    @Published var lessons: [Lesson] = [] {
+        didSet { save(lessons, key: lessonsKey) }
+    }
+
     private let itemsKey = "studyPlanner.items"
     private let subjectsKey = "studyPlanner.subjects"
+    private let lessonsKey = "studyPlanner.lessons"
 
     init() {
         if let saved: [Assessment] = load(key: itemsKey) {
             items = saved
+        }
+        if let saved: [Lesson] = load(key: lessonsKey) {
+            lessons = saved
         }
         if let saved: [Subject] = load(key: subjectsKey), !saved.isEmpty {
             subjects = saved
@@ -158,6 +166,9 @@ final class StudyStore: ObservableObject {
         for i in items.indices where items[i].subjectID == subject.id {
             items[i].subjectID = Subject.otherID
         }
+        for i in lessons.indices where lessons[i].subjectID == subject.id {
+            lessons[i].subjectID = Subject.otherID
+        }
         subjects.removeAll { $0.id == subject.id }
     }
 
@@ -176,6 +187,118 @@ final class StudyStore: ObservableObject {
             .compactMap { $0.percentage }
         guard !marks.isEmpty else { return nil }
         return marks.reduce(0, +) / Double(marks.count)
+    }
+
+    // ---- Timetable ----
+    // Lessons for one weekday (2 = Monday … 6 = Friday), earliest first.
+    func lessons(on weekday: Int) -> [Lesson] {
+        lessons
+            .filter { $0.weekday == weekday }
+            .sorted { $0.startMinutes < $1.startMinutes }
+    }
+
+    func addLesson(_ lesson: Lesson) {
+        lessons.append(lesson)
+    }
+
+    func updateLesson(_ lesson: Lesson) {
+        guard let i = lessons.firstIndex(where: { $0.id == lesson.id }) else { return }
+        lessons[i] = lesson
+    }
+
+    func deleteLesson(_ lesson: Lesson) {
+        lessons.removeAll { $0.id == lesson.id }
+    }
+
+    // ---- Demo data ----
+    var hasDemoData: Bool {
+        items.contains { $0.isDemo } || lessons.contains { $0.isDemo }
+    }
+
+    // Adds sample assessments and a week of lessons so a new
+    // user can see how everything works. Reminders and Calendar
+    // sync are skipped on purpose, so demo items never leak out.
+    func loadDemoData() {
+        let calendar = Calendar.current
+        func day(_ offset: Int) -> Date {
+            calendar.date(byAdding: .day, value: offset, to: Date()) ?? Date()
+        }
+        func id(_ subject: Subject) -> String {
+            hasSubject(subject.id) ? subject.id : Subject.otherID
+        }
+
+        var algebra = Assessment(title: "Algebra test", type: .exam,
+                                 subjectID: id(.maths), dueDate: day(3))
+        algebra.reminderDaysBefore = 1
+        algebra.notes = "Chapters 4–5: equations and graphs."
+
+        var essay = Assessment(title: "Persuasive essay", type: .assignment,
+                               subjectID: id(.english), dueDate: day(6))
+        essay.steps = [
+            ChecklistStep(text: "Research", isDone: true),
+            ChecklistStep(text: "Plan", isDone: true),
+            ChecklistStep(text: "Write draft"),
+            ChecklistStep(text: "Check and edit"),
+            ChecklistStep(text: "Hand in")
+        ]
+
+        let quiz = Assessment(title: "Cells quiz", type: .quiz,
+                              subjectID: id(.science), dueDate: day(1))
+
+        var mathsQuiz = Assessment(title: "Fractions quiz", type: .quiz,
+                                   subjectID: id(.maths), dueDate: day(-5))
+        mathsQuiz.isCompleted = true
+        mathsQuiz.score = 17
+        mathsQuiz.outOf = 20
+        mathsQuiz.grade = .b
+        mathsQuiz.studyMinutes = 50
+
+        var report = Assessment(title: "Book report", type: .assignment,
+                                subjectID: id(.english), dueDate: day(-12))
+        report.isCompleted = true
+        report.score = 78
+        report.outOf = 100
+        report.grade = .b
+
+        let demoItems = [algebra, essay, quiz, mathsQuiz, report].map { item -> Assessment in
+            var item = item
+            item.isDemo = true
+            return item
+        }
+        items.append(contentsOf: demoItems)
+
+        // Four lessons a day, Monday to Friday.
+        let slots = [(510, 560), (565, 615), (640, 690), (695, 745)]
+        let week: [[Subject]] = [
+            [.maths, .english, .science, .hpe],
+            [.english, .humanities, .maths, .pde],
+            [.science, .maths, .english, .humanities],
+            [.hpe, .science, .maths, .english],
+            [.humanities, .english, .science, .maths]
+        ]
+        let teachers: [String: String] = [
+            Subject.maths.id: "Ms Patel", Subject.english.id: "Mr Clarke",
+            Subject.science.id: "Dr Evans", Subject.humanities.id: "Mrs Nguyen",
+            Subject.hpe.id: "Mr Brown", Subject.pde.id: "Ms Lee"
+        ]
+        var demoLessons: [Lesson] = []
+        for (dayIndex, subjects) in week.enumerated() {
+            for (slotIndex, subject) in subjects.enumerated() {
+                demoLessons.append(Lesson(subjectID: id(subject),
+                                          weekday: dayIndex + 2,
+                                          startMinutes: slots[slotIndex].0,
+                                          endMinutes: slots[slotIndex].1,
+                                          room: "R\(slotIndex + 1).0\(dayIndex + 1)",
+                                          teacher: teachers[subject.id] ?? "",
+                                          isDemo: true))
+            }
+        }
+        lessons.append(contentsOf: demoLessons)
+    }
+
+    func removeDemoData() {
+        items.filter { $0.isDemo }.forEach { delete($0) }
+        lessons.removeAll { $0.isDemo }
     }
 
     // ---- Saving helpers ----

@@ -1,4 +1,6 @@
 import SwiftUI
+import UserNotifications
+import UIKit
 
 // MARK: - Planner tab
 struct PlannerView: View {
@@ -11,6 +13,35 @@ struct PlannerView: View {
 
     @AppStorage("studentName") private var studentName = ""
     @AppStorage("accentColour") private var accent: SubjectColour = .indigo
+    @AppStorage("dismissedNotificationNudge") private var nudgeDismissed = false
+
+    // Starts as "authorized" so the card never flashes before we know.
+    @State private var notificationStatus: UNAuthorizationStatus = .authorized
+
+    private var showNotificationNudge: Bool {
+        !nudgeDismissed && (notificationStatus == .notDetermined || notificationStatus == .denied)
+    }
+
+    private func refreshNotificationStatus() async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        notificationStatus = settings.authorizationStatus
+    }
+
+    private func enableNotifications() {
+        if notificationStatus == .denied {
+            if let url = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(url)
+            }
+            return
+        }
+        UNUserNotificationCenter.current()
+            .requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+                DispatchQueue.main.async {
+                    if granted { store.rescheduleAllReminders() }
+                    Task { await refreshNotificationStatus() }
+                }
+            }
+    }
 
     private var visible: [Assessment] {
         store.items.filter { subjectFilter == nil || $0.subjectID == subjectFilter }
@@ -63,6 +94,16 @@ struct PlannerView: View {
     var body: some View {
         NavigationStack {
             List {
+                if showNotificationNudge {
+                    Section {
+                        NotificationNudgeCard(status: notificationStatus,
+                                              onEnable: enableNotifications,
+                                              onDismiss: { withAnimation { nudgeDismissed = true } })
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                }
+
                 Section {
                     VStack(alignment: .leading, spacing: 14) {
                         VStack(alignment: .leading, spacing: 4) {
@@ -132,6 +173,7 @@ struct PlannerView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .task { await refreshNotificationStatus() }
             .navigationTitle("Planner")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {

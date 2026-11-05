@@ -53,6 +53,7 @@ struct Assessment: Identifiable, Codable, Equatable {
     var grade: Grade? = nil
     var studyMinutes = 0                 // added by the Focus timer
     var calendarEventID: String? = nil   // link to the Calendar app event
+    var isDemo = false                   // added by "Start with demo data"
 
     init(title: String, type: AssessmentType, subjectID: String, dueDate: Date) {
         self.title = title
@@ -83,7 +84,7 @@ struct Assessment: Identifiable, Codable, Equatable {
     // tasks saved by the previous version still load.
     enum CodingKeys: String, CodingKey {
         case id, title, type, dueDate, notes, reminderDaysBefore, isCompleted
-        case steps, score, outOf, grade, studyMinutes, calendarEventID
+        case steps, score, outOf, grade, studyMinutes, calendarEventID, isDemo
         case subjectID = "subject"
     }
 
@@ -105,5 +106,6 @@ struct Assessment: Identifiable, Codable, Equatable {
         grade = (try? c.decodeIfPresent(Grade.self, forKey: .grade)) ?? nil
         studyMinutes = try c.decodeIfPresent(Int.self, forKey: .studyMinutes) ?? 0
         calendarEventID = try c.decodeIfPresent(String.self, forKey: .calendarEventID)
+        isDemo = try c.decodeIfPresent(Bool.self, forKey: .isDemo) ?? false
     }
 }
