@@ -7,7 +7,7 @@ below in Safari, then press one button each time you want a new build.
 
 ### 1. Register the app ID and create the app record
 - developer.apple.com → Certificates, Identifiers & Profiles → **Identifiers → +**
-  → App IDs → App. Bundle ID (Explicit), e.g. `com.rikiwessels.swotty`.
+  → App IDs → App. Bundle ID (Explicit), e.g. `com.boundaryline.swotty`.
   Enable no extra capabilities (Swotty doesn't need any).
 - appstoreconnect.apple.com → **Apps → + → New App**. Platform iOS, name
   *Swotty*, pick that bundle ID, any SKU (e.g. `swotty`).

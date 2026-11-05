@@ -24,7 +24,7 @@ build settings, then re-run `xcodegen generate`.
 Before your first device or App Store build, in `project.yml`:
 
 1. Set `PRODUCT_BUNDLE_IDENTIFIER` to the ID registered in
-   *Certificates, Identifiers & Profiles* (currently a placeholder).
+   *Certificates, Identifiers & Profiles* (currently `com.boundaryline.swotty`).
 2. Uncomment `DEVELOPMENT_TEAM` and add your Team ID.
 3. A placeholder app icon is included. Replace
    `Swotty/Resources/Assets.xcassets/AppIcon.appiconset/icon-1024.png`
