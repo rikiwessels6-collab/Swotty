@@ -8,6 +8,7 @@ on:
 jobs:
   build-test:
     runs-on: macos-15
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -17,10 +18,23 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Build and test
+      # Compiles the app and tests without needing a specific simulator.
+      - name: Build
         run: |
-          xcodebuild test \
+          xcodebuild build-for-testing \
             -project Swotty.xcodeproj \
             -scheme Swotty \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Find a simulator
+        id: sim
+        run: echo "udid=$(bash scripts/ci-simulator.sh)" >> "$GITHUB_OUTPUT"
+
+      - name: Test
+        run: |
+          xcodebuild test-without-building \
+            -project Swotty.xcodeproj \
+            -scheme Swotty \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
             CODE_SIGNING_ALLOWED=NO
