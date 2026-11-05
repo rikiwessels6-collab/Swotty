@@ -68,6 +68,9 @@ jobs:
           fi
           if [ "$ok" = 1 ]; then echo "All secrets look correctly formatted."; else exit 1; fi
 
+      # The archive is built unsigned on purpose: an automatically signed
+      # archive needs a development profile, which needs a registered
+      # device. The export step below signs for the App Store instead.
       - name: Archive
         run: |
           xcodebuild archive \
@@ -76,12 +79,9 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/Swotty.xcarchive" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_${ASC_KEY_ID}.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}"
 
       - name: Export and upload to App Store Connect
