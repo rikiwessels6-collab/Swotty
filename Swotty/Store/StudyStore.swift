@@ -13,9 +13,14 @@ final class StudyStore: ObservableObject {
         didSet { save(lessons, key: lessonsKey) }
     }
 
+    @Published var notes: [ClassNote] = [] {
+        didSet { save(notes, key: notesKey) }
+    }
+
     private let itemsKey = "studyPlanner.items"
     private let subjectsKey = "studyPlanner.subjects"
     private let lessonsKey = "studyPlanner.lessons"
+    private let notesKey = "studyPlanner.notes"
 
     init() {
         if let saved: [Assessment] = load(key: itemsKey) {
@@ -23,6 +28,9 @@ final class StudyStore: ObservableObject {
         }
         if let saved: [Lesson] = load(key: lessonsKey) {
             lessons = saved
+        }
+        if let saved: [ClassNote] = load(key: notesKey) {
+            notes = saved
         }
         if let saved: [Subject] = load(key: subjectsKey), !saved.isEmpty {
             subjects = saved
@@ -169,6 +177,9 @@ final class StudyStore: ObservableObject {
         for i in lessons.indices where lessons[i].subjectID == subject.id {
             lessons[i].subjectID = Subject.otherID
         }
+        for i in notes.indices where notes[i].subjectID == subject.id {
+            notes[i].subjectID = Subject.otherID
+        }
         subjects.removeAll { $0.id == subject.id }
     }
 
@@ -194,7 +205,8 @@ final class StudyStore: ObservableObject {
                    studentName: UserDefaults.standard.string(forKey: "studentName") ?? "",
                    subjects: subjects,
                    items: items,
-                   lessons: lessons)
+                   lessons: lessons,
+                   notes: notes)
     }
 
     // Replaces everything with the backup's contents.
@@ -209,6 +221,7 @@ final class StudyStore: ObservableObject {
         }
         subjects = restoredSubjects
         lessons = backup.lessons
+        notes = backup.notes
         items = backup.items.map { item in
             var item = item
             item.calendarEventID = nil   // events are recreated below if sync is on
@@ -243,9 +256,44 @@ final class StudyStore: ObservableObject {
         lessons.removeAll { $0.id == lesson.id }
     }
 
+    // ---- Class notes ----
+    // Notes taken on one day (any time that day).
+    func notes(on day: Date) -> [ClassNote] {
+        notes
+            .filter { Calendar.current.isDate($0.date, inSameDayAs: day) }
+            .sorted { !$0.isReviewed && $1.isReviewed }
+    }
+
+    // Flagged for review and not ticked off yet, newest class first.
+    var pendingReviewNotes: [ClassNote] {
+        notes.filter { $0.isPendingReview }.sorted { $0.date > $1.date }
+    }
+
+    var reviewedNotes: [ClassNote] {
+        notes.filter { $0.needsReview && $0.isReviewed }.sorted { $0.date > $1.date }
+    }
+
+    func addNote(_ note: ClassNote) {
+        notes.append(note)
+    }
+
+    func updateNote(_ note: ClassNote) {
+        guard let i = notes.firstIndex(where: { $0.id == note.id }) else { return }
+        notes[i] = note
+    }
+
+    func deleteNote(_ note: ClassNote) {
+        notes.removeAll { $0.id == note.id }
+    }
+
+    func toggleReviewed(_ note: ClassNote) {
+        guard let i = notes.firstIndex(where: { $0.id == note.id }) else { return }
+        notes[i].isReviewed.toggle()
+    }
+
     // ---- Demo data ----
     var hasDemoData: Bool {
-        items.contains { $0.isDemo } || lessons.contains { $0.isDemo }
+        items.contains { $0.isDemo } || lessons.contains { $0.isDemo } || notes.contains { $0.isDemo }
     }
 
     // Adds sample assessments and a week of lessons so a new
@@ -327,11 +375,34 @@ final class StudyStore: ObservableObject {
             }
         }
         lessons.append(contentsOf: demoLessons)
+
+        // A couple of class notes on the most recent school day.
+        var noteDay = calendar.startOfDay(for: Date())
+        while !(2...6).contains(calendar.component(.weekday, from: noteDay)) {
+            noteDay = calendar.date(byAdding: .day, value: -1, to: noteDay) ?? noteDay
+        }
+        let noteWeekday = calendar.component(.weekday, from: noteDay)
+        let dayLessons = demoLessons
+            .filter { $0.weekday == noteWeekday }
+            .sorted { $0.startMinutes < $1.startMinutes }
+        let sampleText = [
+            "Go over the worked examples from class and redo questions 4–8.",
+            "Reread the chapter and write three questions to ask next lesson."
+        ]
+        var demoNotes: [ClassNote] = []
+        for (lesson, text) in zip(dayLessons.prefix(2), sampleText) {
+            var note = ClassNote(date: noteDay, subjectID: lesson.subjectID,
+                                 lessonID: lesson.id, text: text, needsReview: true)
+            note.isDemo = true
+            demoNotes.append(note)
+        }
+        notes.append(contentsOf: demoNotes)
     }
 
     func removeDemoData() {
         items.filter { $0.isDemo }.forEach { delete($0) }
         lessons.removeAll { $0.isDemo }
+        notes.removeAll { $0.isDemo }
     }
 
     // ---- Saving helpers ----
