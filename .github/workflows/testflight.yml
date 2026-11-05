@@ -1,9 +1,14 @@
 name: Upload to TestFlight
 
 # Run manually: GitHub → Actions → "Upload to TestFlight" → Run workflow.
+# It also runs when a tag starting with "testflight-" is pushed
+# (e.g. testflight-1), so a build can be started from git alone.
 # Needs the repository secrets listed in docs/TESTFLIGHT.md.
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'testflight-*'
 
 jobs:
   testflight:
