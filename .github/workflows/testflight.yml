@@ -37,10 +37,36 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/keys"
           if [ -n "$ASC_KEY_P8" ]; then
-            printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/keys/AuthKey_${ASC_KEY_ID}.p8"
+            printf '%s\n' "$ASC_KEY_P8" | tr -d '\r' > "$RUNNER_TEMP/keys/AuthKey_${ASC_KEY_ID}.p8"
           else
             echo "$ASC_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/keys/AuthKey_${ASC_KEY_ID}.p8"
           fi
+
+      # Checks the shape of each secret (never prints their values) so a
+      # typo is reported here instead of as a vague 401 from Apple.
+      - name: Validate secrets
+        run: |
+          KEY_FILE="$RUNNER_TEMP/keys/AuthKey_${ASC_KEY_ID}.p8"
+          ok=1
+          if ! [[ "$TEAM_ID" =~ ^[A-Z0-9]{10}$ ]]; then
+            echo "::error::APPLE_TEAM_ID should be 10 letters/numbers (check for spaces or extra characters)"; ok=0
+          fi
+          if ! [[ "$ASC_KEY_ID" =~ ^[A-Z0-9]{10}$ ]]; then
+            echo "::error::ASC_KEY_ID should be 10 letters/numbers, e.g. the part of AuthKey_XXXXXXXXXX.p8 between the underscore and .p8"; ok=0
+          fi
+          if ! [[ "$ASC_ISSUER_ID" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+            echo "::error::ASC_ISSUER_ID should look like xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (copy it from the top of the App Store Connect API page)"; ok=0
+          fi
+          if ! head -n 1 "$KEY_FILE" | grep -q -- '-----BEGIN PRIVATE KEY-----'; then
+            echo "::error::ASC_KEY_P8 must start with the line -----BEGIN PRIVATE KEY-----"; ok=0
+          fi
+          if ! tail -n 1 "$KEY_FILE" | grep -q -- '-----END PRIVATE KEY-----'; then
+            echo "::error::ASC_KEY_P8 must end with the line -----END PRIVATE KEY-----"; ok=0
+          fi
+          if ! openssl pkey -in "$KEY_FILE" -noout 2>/dev/null; then
+            echo "::error::ASC_KEY_P8 could not be read as a private key. Re-copy the whole text of the .p8 file."; ok=0
+          fi
+          if [ "$ok" = 1 ]; then echo "All secrets look correctly formatted."; else exit 1; fi
 
       - name: Archive
         run: |
