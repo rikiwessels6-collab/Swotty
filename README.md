@@ -7,7 +7,7 @@ run a Focus timer, and review results with charts.
 All data stays on the device (UserDefaults). No accounts, no tracking.
 
 Features: planner with steps and reminders, weekly timetable, month calendar,
-day-by-day class view with notes to review, Calendar-app sync, Focus timer, weighted grades with per-subject averages and
+day-by-day class view with notes to review, optional class and review reminders, a Today card, Calendar-app sync, Focus timer, weighted grades with per-subject averages and
 charts, and backup/restore to a JSON file (Settings → Backup).
 
 ## Getting started (on a Mac)

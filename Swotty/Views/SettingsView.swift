@@ -10,6 +10,10 @@ struct SettingsView: View {
     @AppStorage("studentName") private var studentName = ""
     @AppStorage("accentColour") private var accent: SubjectColour = .indigo
 
+    @AppStorage("classRemindersEnabled") private var classRemindersOn = false
+    @AppStorage("classReminderMinutes") private var classReminderMinutes = 10
+    @AppStorage("reviewRemindersEnabled") private var reviewRemindersOn = false
+
     @State private var calendarSyncOn = CalendarSync.shared.isEnabled
     @State private var showingAccessDenied = false
     @State private var confirmingSyncOff = false
@@ -88,6 +92,40 @@ struct SettingsView: View {
                     }
                 } header: {
                     Text("Reminders")
+                }
+
+                Section {
+                    Toggle("Before each class", isOn: Binding(
+                        get: { classRemindersOn },
+                        set: { newValue in
+                            classRemindersOn = newValue
+                            store.refreshClassReminders()
+                        }
+                    ))
+                    if classRemindersOn {
+                        Picker("How early", selection: Binding(
+                            get: { classReminderMinutes },
+                            set: { newValue in
+                                classReminderMinutes = newValue
+                                store.refreshClassReminders()
+                            }
+                        )) {
+                            ForEach([5, 10, 15, 30], id: \.self) { minutes in
+                                Text("\(minutes) minutes").tag(minutes)
+                            }
+                        }
+                    }
+                    Toggle("Notes to review", isOn: Binding(
+                        get: { reviewRemindersOn },
+                        set: { newValue in
+                            reviewRemindersOn = newValue
+                            store.refreshClassReminders()
+                        }
+                    ))
+                } header: {
+                    Text("Class reminders")
+                } footer: {
+                    Text("Class reminders repeat every week using your timetable. The notes reminder arrives at your reminder time while you have notes waiting to be reviewed.")
                 }
 
                 Section {

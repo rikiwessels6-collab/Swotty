@@ -167,10 +167,12 @@ struct LessonEditor: View {
     @State private var end: Date
     @State private var room: String
     @State private var teacher: String
+    @State private var repeatDays: Set<Int>
     @State private var confirmingDelete = false
 
     init(existing: Lesson?, defaultWeekday: Int, defaultSubjectID: String) {
         self.existing = existing
+        _repeatDays = State(initialValue: [existing?.weekday ?? defaultWeekday])
         _subjectID = State(initialValue: existing?.subjectID ?? defaultSubjectID)
         _weekday = State(initialValue: existing?.weekday ?? defaultWeekday)
         _start = State(initialValue: Lesson.date(forMinutes: existing?.startMinutes ?? 540))
@@ -193,9 +195,21 @@ struct LessonEditor: View {
                                 .tag(subject.id)
                         }
                     }
-                    Picker("Day", selection: $weekday) {
-                        ForEach([2, 3, 4, 5, 6], id: \.self) { day in
-                            Text(Calendar.current.weekdaySymbols[day - 1]).tag(day)
+                    if existing == nil {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Days")
+                            HStack(spacing: 8) {
+                                ForEach([2, 3, 4, 5, 6], id: \.self) { day in
+                                    dayChip(day)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    } else {
+                        Picker("Day", selection: $weekday) {
+                            ForEach([2, 3, 4, 5, 6], id: \.self) { day in
+                                Text(Calendar.current.weekdaySymbols[day - 1]).tag(day)
+                            }
                         }
                     }
                 }
@@ -235,7 +249,7 @@ struct LessonEditor: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
                         .bold()
-                        .disabled(!timesAreValid)
+                        .disabled(!timesAreValid || (existing == nil && repeatDays.isEmpty))
                 }
             }
             .confirmationDialog("Delete this lesson?", isPresented: $confirmingDelete,
@@ -248,20 +262,51 @@ struct LessonEditor: View {
         }
     }
 
-    private func save() {
-        var lesson = existing ?? Lesson(subjectID: subjectID, weekday: weekday,
-                                        startMinutes: 0, endMinutes: 0)
-        lesson.subjectID = subjectID
-        lesson.weekday = weekday
-        lesson.startMinutes = Lesson.minutes(from: start)
-        lesson.endMinutes = Lesson.minutes(from: end)
-        lesson.room = room.trimmingCharacters(in: .whitespaces)
-        lesson.teacher = teacher.trimmingCharacters(in: .whitespaces)
+    // One tappable day in the "Days" row (new lessons only).
+    private func dayChip(_ day: Int) -> some View {
+        let isOn = repeatDays.contains(day)
+        return Button {
+            if isOn {
+                repeatDays.remove(day)
+            } else {
+                repeatDays.insert(day)
+            }
+        } label: {
+            Text(Calendar.current.shortWeekdaySymbols[day - 1])
+                .font(.subheadline)
+                .bold()
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(isOn ? AnyShapeStyle(TintShapeStyle()) : AnyShapeStyle(Color(.tertiarySystemFill)))
+                .foregroundStyle(isOn ? Color.white : Color.primary)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Calendar.current.weekdaySymbols[day - 1])
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+    }
 
-        if existing == nil {
-            store.addLesson(lesson)
-        } else {
+    private func save() {
+        let startMinutes = Lesson.minutes(from: start)
+        let endMinutes = Lesson.minutes(from: end)
+        let roomText = room.trimmingCharacters(in: .whitespaces)
+        let teacherText = teacher.trimmingCharacters(in: .whitespaces)
+
+        if var lesson = existing {
+            lesson.subjectID = subjectID
+            lesson.weekday = weekday
+            lesson.startMinutes = startMinutes
+            lesson.endMinutes = endMinutes
+            lesson.room = roomText
+            lesson.teacher = teacherText
             store.updateLesson(lesson)
+        } else {
+            // A new lesson can repeat on several days at once.
+            for day in repeatDays.sorted() {
+                store.addLesson(Lesson(subjectID: subjectID, weekday: day,
+                                       startMinutes: startMinutes, endMinutes: endMinutes,
+                                       room: roomText, teacher: teacherText))
+            }
         }
         dismiss()
     }
