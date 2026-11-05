@@ -1,232 +1,132 @@
 import SwiftUI
 
 // MARK: - Settings tab
+// A short, grouped home screen. Each row opens a focused screen.
 struct SettingsView: View {
     @EnvironmentObject private var store: StudyStore
-
-    // @AppStorage saves these automatically.
-    @AppStorage("appearance") private var appearance: AppearanceMode = .system
-    @AppStorage("reminderHour") private var reminderHour = 16
     @AppStorage("studentName") private var studentName = ""
-    @AppStorage("accentColour") private var accent: SubjectColour = .indigo
-
     @AppStorage("classRemindersEnabled") private var classRemindersOn = false
-    @AppStorage("classReminderMinutes") private var classReminderMinutes = 10
     @AppStorage("reviewRemindersEnabled") private var reviewRemindersOn = false
 
-    @State private var calendarSyncOn = CalendarSync.shared.isEnabled
-    @State private var showingAccessDenied = false
-    @State private var confirmingSyncOff = false
-    @State private var confirmingClear = false
-    @State private var confirmingRemoveDemo = false
-
-    private var completedCount: Int {
-        store.items.filter { $0.isCompleted }.count
+    private var remindersSummary: String {
+        classRemindersOn || reviewRemindersOn ? "On" : "Off"
     }
 
     var body: some View {
         NavigationStack {
-            Form {
+            List {
                 Section {
-                    TextField("Your name", text: $studentName)
-                        .textContentType(.givenName)
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("App colour")
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 40), spacing: 10)], spacing: 10) {
-                            ForEach(SubjectColour.allCases) { colour in
-                                Circle()
-                                    .fill(colour.color)
-                                    .frame(width: 32, height: 32)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.primary, lineWidth: accent == colour ? 3 : 0)
-                                            .padding(-4)
-                                    )
-                                    .onTapGesture { accent = colour }
-                                    .accessibilityLabel(colour.rawValue)
-                            }
-                        }
+                    HStack(spacing: 14) {
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Theme.onAccent)
+                            .frame(width: 40, height: 40)
+                            .background(Circle().fill(Theme.gold))
+                        TextField("Your name", text: $studentName)
+                            .textContentType(.givenName)
+                            .font(.display(.title3))
                     }
                     .padding(.vertical, 4)
-                } header: {
-                    Text("Personalise")
                 } footer: {
                     Text("Your name appears in the greeting on the Planner.")
                 }
+                .listRowBackground(Theme.surface)
 
-                Section {
-                    Picker("Theme", selection: $appearance) {
-                        ForEach(AppearanceMode.allCases) { mode in
-                            Text(mode.rawValue).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                } header: {
-                    Text("Appearance")
-                } footer: {
-                    Text("System matches your device's own light or dark setting.")
-                }
-
-                Section {
+                Section("Study") {
                     NavigationLink {
                         SubjectsListView()
                     } label: {
-                        LabeledContent("Subjects", value: "\(store.subjects.count)")
+                        SettingsRow(icon: "books.vertical.fill", tint: Theme.emerald,
+                                    title: "Subjects", detail: "\(store.subjects.count)")
+                    }
+                    NavigationLink {
+                        ScheduleSettingsView()
+                    } label: {
+                        SettingsRow(icon: "calendar.badge.clock", tint: Color(hex: 0x4C7DDB),
+                                    title: "Timetable & Days")
+                    }
+                    NavigationLink {
+                        ReminderSettingsView()
+                    } label: {
+                        SettingsRow(icon: "bell.badge.fill", tint: Color(hex: 0xD1495B),
+                                    title: "Reminders", detail: remindersSummary)
                     }
                 }
+                .listRowBackground(Theme.surface)
+
+                Section("Sync & Backup") {
+                    NavigationLink {
+                        CalendarSettingsView()
+                    } label: {
+                        SettingsRow(icon: "calendar", tint: Color(hex: 0xE08E45),
+                                    title: "Calendar Sync")
+                    }
+                    NavigationLink {
+                        BackupSettingsView()
+                    } label: {
+                        SettingsRow(icon: "externaldrive.fill.badge.timemachine", tint: Color(hex: 0x6B63D6),
+                                    title: "Backup & Restore")
+                    }
+                }
+                .listRowBackground(Theme.surface)
+
+                Section("Look & Feel") {
+                    NavigationLink {
+                        AppearanceSettingsView()
+                    } label: {
+                        SettingsRow(icon: "paintpalette.fill", tint: Theme.gold,
+                                    title: "Appearance")
+                    }
+                }
+                .listRowBackground(Theme.surface)
+
+                Section("Data") {
+                    NavigationLink {
+                        DataSettingsView()
+                    } label: {
+                        SettingsRow(icon: "tray.full.fill", tint: Color(hex: 0x2A9DA8),
+                                    title: "Manage Data")
+                    }
+                }
+                .listRowBackground(Theme.surface)
 
                 Section {
-                    // A custom Binding so existing reminders move
-                    // to the new time straight away.
-                    Picker("Reminder time", selection: Binding(
-                        get: { reminderHour },
-                        set: { newHour in
-                            reminderHour = newHour
-                            store.rescheduleAllReminders()
-                        }
-                    )) {
-                        ForEach(6...21, id: \.self) { hour in
-                            Text(ReminderScheduler.label(forHour: hour)).tag(hour)
-                        }
-                    }
-                } header: {
-                    Text("Reminders")
-                }
-
-                Section {
-                    Toggle("Before each class", isOn: Binding(
-                        get: { classRemindersOn },
-                        set: { newValue in
-                            classRemindersOn = newValue
-                            store.refreshClassReminders()
-                        }
-                    ))
-                    if classRemindersOn {
-                        Picker("How early", selection: Binding(
-                            get: { classReminderMinutes },
-                            set: { newValue in
-                                classReminderMinutes = newValue
-                                store.refreshClassReminders()
-                            }
-                        )) {
-                            ForEach([5, 10, 15, 30], id: \.self) { minutes in
-                                Text("\(minutes) minutes").tag(minutes)
-                            }
-                        }
-                    }
-                    Toggle("Notes to review", isOn: Binding(
-                        get: { reviewRemindersOn },
-                        set: { newValue in
-                            reviewRemindersOn = newValue
-                            store.refreshClassReminders()
-                        }
-                    ))
-                } header: {
-                    Text("Class reminders")
-                } footer: {
-                    Text("Class reminders repeat every week using your timetable. The notes reminder arrives at your reminder time while you have notes waiting to be reviewed.")
-                }
-
-                Section {
-                    Toggle("Sync to Calendar", isOn: Binding(
-                        get: { calendarSyncOn },
-                        set: { turnOn in
-                            if turnOn {
-                                enableCalendarSync()
-                            } else {
-                                confirmingSyncOff = true
-                            }
-                        }
-                    ))
-                    if calendarSyncOn {
-                        Button("Sync Now") {
-                            store.syncAllToCalendar()
-                        }
-                    }
-                } header: {
-                    Text("Calendar")
-                } footer: {
-                    Text("Adds each assessment as an all-day event in a \"\(appName)\" calendar in the Calendar app. Changes here update the calendar automatically.")
-                }
-
-                BackupSection()
-
-                if store.hasDemoData {
-                    Section {
-                        Button("Remove Demo Data", role: .destructive) {
-                            confirmingRemoveDemo = true
-                        }
-                    } footer: {
-                        Text("Removes the sample assessments and lessons added when you started with demo data. Your own entries are kept.")
+                    NavigationLink {
+                        AboutView()
+                    } label: {
+                        SettingsRow(icon: "info.circle.fill", tint: Color(hex: 0x8591A5),
+                                    title: "About \(appName)", detail: appVersion)
                     }
                 }
-
-                Section {
-                    Button("Clear Completed (\(completedCount))", role: .destructive) {
-                        confirmingClear = true
-                    }
-                    .disabled(completedCount == 0)
-                } footer: {
-                    Text("Permanently removes ticked-off assessments and their results.")
-                }
-
-                Section {
-                    LabeledContent("App", value: appName)
-                    LabeledContent("Version", value: appVersion)
-                } header: {
-                    Text("About")
-                } footer: {
-                    Text("Your assessments, results and settings are stored only on this device.")
-                }
+                .listRowBackground(Theme.surface)
             }
+            .listStyle(.insetGrouped)
+            .themedList()
             .navigationTitle("Settings")
-            .onAppear {
-                calendarSyncOn = CalendarSync.shared.isEnabled
-            }
-            .alert("Calendar access is off", isPresented: $showingAccessDenied) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("To sync, open the Settings app, choose Privacy & Security > Calendars, and allow full access for this app.")
-            }
-            .confirmationDialog("Stop syncing to Calendar?", isPresented: $confirmingSyncOff,
-                                titleVisibility: .visible) {
-                Button("Stop and Remove Events", role: .destructive) {
-                    store.removeAllFromCalendar()
-                    CalendarSync.shared.setEnabled(false)
-                    calendarSyncOn = false
-                }
-                Button("Stop but Keep Events") {
-                    CalendarSync.shared.setEnabled(false)
-                    calendarSyncOn = false
-                }
-            }
-            .confirmationDialog("Remove the demo data?",
-                                isPresented: $confirmingRemoveDemo,
-                                titleVisibility: .visible) {
-                Button("Remove Demo Data", role: .destructive) {
-                    withAnimation { store.removeDemoData() }
-                }
-            }
-            .confirmationDialog("Clear \(completedCount) completed assessments?",
-                                isPresented: $confirmingClear,
-                                titleVisibility: .visible) {
-                Button("Clear Completed", role: .destructive) {
-                    withAnimation { store.clearCompleted() }
-                }
-            }
         }
     }
+}
 
-    private func enableCalendarSync() {
-        CalendarSync.shared.requestAccess { granted in
-            if granted {
-                CalendarSync.shared.setEnabled(true)
-                calendarSyncOn = true
-                store.syncAllToCalendar()
-            } else {
-                calendarSyncOn = false
-                showingAccessDenied = true
+// A settings row: a coloured icon tile, the title, and an optional detail.
+struct SettingsRow: View {
+    let icon: String
+    let tint: Color
+    let title: String
+    var detail: String? = nil
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .background(tint.gradient)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            Text(title)
+            Spacer()
+            if let detail {
+                Text(detail)
+                    .foregroundStyle(.secondary)
             }
         }
     }

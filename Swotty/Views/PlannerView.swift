@@ -123,8 +123,7 @@ struct PlannerView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(greeting)
-                                .font(.title2)
-                                .bold()
+                                .font(.display(.title2))
                             Text(summary)
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
@@ -162,6 +161,7 @@ struct PlannerView: View {
                                        title: "No assessments yet",
                                        message: "Tap + to add an exam, assignment or quiz.")
                     }
+                    .listRowBackground(Theme.surface)
                 }
 
                 taskSection("Overdue", items: overdue)
@@ -185,9 +185,11 @@ struct PlannerView: View {
                             .font(.caption)
                         }
                     }
+                    .listRowBackground(Theme.surface)
                 }
             }
             .listStyle(.insetGrouped)
+            .themedList()
             .task { await refreshNotificationStatus() }
             .sheet(isPresented: $showingReview) {
                 ReviewNotesView()
@@ -225,6 +227,7 @@ struct PlannerView: View {
                     row(for: item)
                 }
             }
+            .listRowBackground(Theme.surface)
         }
     }
 

@@ -155,7 +155,7 @@ struct StatTile: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .background(Color(.secondarySystemGroupedBackground))
+        .background(Theme.surface)
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 }
@@ -248,8 +248,8 @@ struct FilterChip: View {
                 .bold()
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
-                .background(isSelected ? color : Color(.secondarySystemGroupedBackground))
-                .foregroundStyle(isSelected ? Color.white : Color.primary)
+                .background(isSelected ? color : Theme.surface)
+                .foregroundStyle(isSelected ? (color.prefersDarkText ? Theme.onAccent : Color.white) : Color.primary)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)

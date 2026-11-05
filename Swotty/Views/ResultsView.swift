@@ -94,6 +94,7 @@ struct ResultsView: View {
                                        ? "Open an assessment and add your mark or grade once it's been marked."
                                        : "No results in this time range. Try \"All time\".")
                     }
+                    .listRowBackground(Theme.surface)
                 } else {
                     Section {
                         HStack(spacing: 10) {
@@ -125,16 +126,19 @@ struct ResultsView: View {
                         } footer: {
                             Text("Weighted averages. Set a weight on each assessment to make bigger tasks count more.")
                         }
+                        .listRowBackground(Theme.surface)
 
                         Section("Average by subject") {
                             averagesChart
                         }
+                        .listRowBackground(Theme.surface)
                     }
 
                     if markedResults.count >= 2 {
                         Section("Marks over time") {
                             trendChart
                         }
+                        .listRowBackground(Theme.surface)
                     }
 
                     Section("All results") {
@@ -144,9 +148,11 @@ struct ResultsView: View {
                                 .onTapGesture { editingItem = item }
                         }
                     }
+                    .listRowBackground(Theme.surface)
                 }
             }
             .listStyle(.insetGrouped)
+            .themedList()
             .navigationTitle("Results")
             .sheet(item: $editingItem) { item in
                 AssessmentEditor(existing: item)

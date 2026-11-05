@@ -24,6 +24,7 @@ struct ReviewNotesView: View {
                                        ? "Add a note to a class and mark it \"needs review\"."
                                        : "You're all caught up. Nice work!")
                     }
+                    .listRowBackground(Theme.surface)
                 } else {
                     ForEach(store.subjects) { subject in
                         let items = pending.filter { $0.subjectID == subject.id }
@@ -35,6 +36,7 @@ struct ReviewNotesView: View {
                             } header: {
                                 SubjectTag(subject: subject)
                             }
+                            .listRowBackground(Theme.surface)
                         }
                     }
                 }
@@ -56,9 +58,11 @@ struct ReviewNotesView: View {
                             .font(.caption)
                         }
                     }
+                    .listRowBackground(Theme.surface)
                 }
             }
             .listStyle(.insetGrouped)
+            .themedList()
             .navigationTitle("Notes to Review")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -11,11 +11,16 @@ struct NoteTarget: Identifiable {
 // MARK: - Day view
 // One day at a time: the classes from the weekly timetable, the notes
 // taken in each class, and anything due that day.
+// (The navigation stack and title come from ScheduleView.)
 struct DayView: View {
     @EnvironmentObject private var store: StudyStore
-    @Binding var mode: ScheduleMode
+    @Binding var day: Date
+    let onEditTimetable: () -> Void
 
-    @State private var day = Calendar.current.startOfDay(for: Date())
+    @AppStorage(ScheduleSettings.showWeekendKey) private var showWeekend = false
+    @AppStorage(ScheduleSettings.weekStartKey) private var weekStart = 2
+    @AppStorage(ScheduleSettings.subjectFilterKey) private var subjectFilter = ""
+
     @State private var noteTarget: NoteTarget? = nil
     @State private var editingItem: Assessment? = nil
     @State private var showingDatePicker = false
@@ -26,9 +31,22 @@ struct DayView: View {
     private var calendar: Calendar { Calendar.current }
 
     private var weekday: Int { calendar.component(.weekday, from: day) }
-    private var isWeekend: Bool { !(2...6).contains(weekday) }
-    private var lessons: [Lesson] { store.lessons(on: weekday) }
-    private var dayNotes: [ClassNote] { store.notes(on: day) }
+    private var visibleDays: [Int] {
+        ScheduleSettings.orderedDays(weekStart: weekStart, showWeekend: showWeekend)
+    }
+    private var isDayOff: Bool { !visibleDays.contains(weekday) }
+
+    private func matchesFilter(_ subjectID: String) -> Bool {
+        subjectFilter.isEmpty || subjectID == subjectFilter
+    }
+
+    private var lessons: [Lesson] {
+        store.lessons(on: weekday).filter { matchesFilter($0.subjectID) }
+    }
+
+    private var dayNotes: [ClassNote] {
+        store.notes(on: day).filter { matchesFilter($0.subjectID) }
+    }
 
     private func notes(for lesson: Lesson) -> [ClassNote] {
         dayNotes.filter { $0.lessonID == lesson.id }
@@ -45,84 +63,83 @@ struct DayView: View {
 
     private var dueToday: [Assessment] {
         store.items
-            .filter { calendar.isDate($0.dueDate, inSameDayAs: day) }
+            .filter { calendar.isDate($0.dueDate, inSameDayAs: day) && matchesFilter($0.subjectID) }
             .sorted { !$0.isCompleted && $1.isCompleted }
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                dateHeader
+        List {
+            dateHeader
 
-                if !dueToday.isEmpty {
-                    Section("Due this day") {
-                        ForEach(dueToday) { item in
-                            AssessmentRow(item: item, subject: store.subject(for: item)) {
-                                withAnimation { store.toggleCompleted(item) }
-                            }
-                            .contentShape(Rectangle())
-                            .onTapGesture { editingItem = item }
+            if !subjectFilter.isEmpty {
+                filterBanner
+            }
+
+            if !dueToday.isEmpty {
+                Section("Due this day") {
+                    ForEach(dueToday) { item in
+                        AssessmentRow(item: item, subject: store.subject(for: item)) {
+                            withAnimation { store.toggleCompleted(item) }
                         }
+                        .contentShape(Rectangle())
+                        .onTapGesture { editingItem = item }
                     }
                 }
-
-                if lessons.isEmpty {
-                    emptyDay
-                } else {
-                    ForEach(lessons) { lesson in
-                        lessonSection(lesson)
-                    }
-                }
-
-                otherNotesSection
+                .listRowBackground(Theme.surface)
             }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Day")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    ScheduleModePicker(mode: $mode)
+
+            if lessons.isEmpty {
+                emptyDay
+            } else {
+                ForEach(lessons) { lesson in
+                    lessonSection(lesson)
                 }
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button {
-                        showingReview = true
-                    } label: {
-                        Image(systemName: "checklist")
-                            .overlay(alignment: .topTrailing) {
-                                if !store.pendingReviewNotes.isEmpty {
-                                    Circle()
-                                        .fill(Color.orange)
-                                        .frame(width: 9, height: 9)
-                                        .offset(x: 4, y: -4)
-                                }
+            }
+
+            otherNotesSection
+        }
+        .listStyle(.insetGrouped)
+        .themedList()
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    showingReview = true
+                } label: {
+                    Image(systemName: "checklist")
+                        .overlay(alignment: .topTrailing) {
+                            if !store.pendingReviewNotes.isEmpty {
+                                Circle()
+                                    .fill(Color.orange)
+                                    .frame(width: 9, height: 9)
+                                    .offset(x: 4, y: -4)
                             }
-                    }
-                    .accessibilityLabel("Notes to review")
-
-                    Button {
-                        showingDatePicker = true
-                    } label: {
-                        Image(systemName: "calendar")
-                    }
-                    .accessibilityLabel("Pick a date")
+                        }
                 }
+                .accessibilityLabel("Notes to review")
+
+                Button {
+                    showingDatePicker = true
+                } label: {
+                    Image(systemName: "calendar")
+                }
+                .accessibilityLabel("Pick a date")
             }
-            .onReceive(ticker) { now = $0 }
-            .sheet(item: $noteTarget) { target in
-                NoteEditor(target: target, day: day)
-                    .environmentObject(store)
-            }
-            .sheet(item: $editingItem) { item in
-                AssessmentEditor(existing: item)
-                    .environmentObject(store)
-            }
-            .sheet(isPresented: $showingDatePicker) {
-                datePickerSheet
-            }
-            .sheet(isPresented: $showingReview) {
-                ReviewNotesView()
-                    .environmentObject(store)
-            }
+        }
+        .onReceive(ticker) { now = $0 }
+        .sheet(item: $noteTarget) { target in
+            NoteEditor(target: target, day: day)
+                .environmentObject(store)
+        }
+        .sheet(item: $editingItem) { item in
+            AssessmentEditor(existing: item)
+                .environmentObject(store)
+        }
+        .sheet(isPresented: $showingDatePicker) {
+            datePickerSheet
+        }
+        .sheet(isPresented: $showingReview) {
+            ReviewNotesView()
+                .environmentObject(store)
         }
     }
 
@@ -144,8 +161,7 @@ struct DayView: View {
 
                 VStack(spacing: 2) {
                     Text(day.formatted(.dateTime.weekday(.wide)))
-                        .font(.title3)
-                        .bold()
+                        .font(.display(.title2))
                     Text(day.formatted(.dateTime.day().month(.wide).year()))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -172,25 +188,52 @@ struct DayView: View {
                 .frame(maxWidth: .infinity)
             }
         }
+        .listRowBackground(Theme.surface)
+    }
+
+    private var filterBanner: some View {
+        Section {
+            HStack {
+                Label("Showing \(store.subject(for: subjectFilter).name) only",
+                      systemImage: "line.3.horizontal.decrease.circle.fill")
+                    .font(.subheadline)
+                Spacer()
+                Button("Clear") { subjectFilter = "" }
+                    .font(.subheadline)
+                    .buttonStyle(.borderless)
+            }
+        }
+        .listRowBackground(Theme.surface)
     }
 
     private var emptyDay: some View {
         Section {
             VStack(spacing: 12) {
                 EmptyStateView(
-                    icon: isWeekend ? "moon.zzz.fill" : "calendar.badge.plus",
-                    title: isWeekend ? "No classes on a weekend" : "No classes on this day",
-                    message: isWeekend
-                    ? "Enjoy the break. You can still add a note below."
-                    : "Add your lessons to the weekly timetable to see them here.")
-                if !isWeekend {
-                    Button("Set up timetable") { mode = .timetable }
-                        .buttonStyle(.borderedProminent)
+                    icon: isDayOff ? "moon.zzz.fill" : "calendar.badge.plus",
+                    title: emptyTitle,
+                    message: emptyMessage)
+                if !isDayOff && subjectFilter.isEmpty {
+                    Button("Edit timetable") { onEditTimetable() }
+                        .buttonStyle(BrandButtonStyle())
                 }
             }
             .frame(maxWidth: .infinity)
             .padding(.bottom, 8)
         }
+        .listRowBackground(Theme.surface)
+    }
+
+    private var emptyTitle: String {
+        if isDayOff { return "A day off" }
+        if !subjectFilter.isEmpty { return "No \(store.subject(for: subjectFilter).name) classes" }
+        return "No classes on this day"
+    }
+
+    private var emptyMessage: String {
+        if isDayOff { return "Nothing is scheduled. You can still add a note below." }
+        if !subjectFilter.isEmpty { return "Clear the subject filter in View Options to see everything." }
+        return "Add your lessons to the weekly timetable to see them here."
     }
 
     // ---- One class and its notes ----
@@ -250,6 +293,7 @@ struct DayView: View {
                 Label("Add a note", systemImage: "square.and.pencil")
             }
         }
+        .listRowBackground(Theme.surface)
     }
 
     private var otherNotesSection: some View {
@@ -258,7 +302,9 @@ struct DayView: View {
                 noteRow(note)
             }
             Button {
-                noteTarget = NoteTarget(subjectID: store.subjects.first?.id ?? Subject.otherID)
+                noteTarget = NoteTarget(subjectID: subjectFilter.isEmpty
+                                        ? (store.subjects.first?.id ?? Subject.otherID)
+                                        : subjectFilter)
             } label: {
                 Label("Add a note for this day", systemImage: "square.and.pencil")
             }
@@ -267,6 +313,7 @@ struct DayView: View {
         } footer: {
             Text("Mark a note \"needs review\" and it stays in your Review list until you tick it off.")
         }
+        .listRowBackground(Theme.surface)
     }
 
     // ---- A single note ----
@@ -280,7 +327,7 @@ struct DayView: View {
                 } label: {
                     Image(systemName: note.isReviewed ? "checkmark.circle.fill" : "circle")
                         .font(.title3)
-                        .foregroundStyle(note.isReviewed ? Color.green : Color.orange)
+                        .foregroundStyle(note.isReviewed ? Theme.emerald : Color.orange)
                 }
                 .buttonStyle(.borderless)
                 .accessibilityLabel(note.isReviewed ? "Mark as not reviewed" : "Mark as reviewed")
@@ -303,7 +350,7 @@ struct DayView: View {
                         Text(note.isReviewed ? "Reviewed" : "To review")
                             .font(.caption)
                             .bold()
-                            .foregroundStyle(note.isReviewed ? Color.green : Color.orange)
+                            .foregroundStyle(note.isReviewed ? Theme.emerald : Color.orange)
                     }
                 }
             }
@@ -343,10 +390,14 @@ struct DayView: View {
         .presentationDetents([.medium, .large])
     }
 
+    // Moves to the previous / next day that is shown (skips a hidden weekend).
     private func shift(by days: Int) {
-        if let newDay = calendar.date(byAdding: .day, value: days, to: day) {
-            withAnimation { day = calendar.startOfDay(for: newDay) }
+        var target = day
+        for _ in 0..<7 {
+            target = calendar.date(byAdding: .day, value: days, to: target) ?? target
+            if visibleDays.contains(calendar.component(.weekday, from: target)) { break }
         }
+        withAnimation { day = calendar.startOfDay(for: target) }
     }
 }
 
@@ -366,7 +417,7 @@ struct NoteEditor: View {
 
     init(target: NoteTarget, day: Date) {
         existing = target.existing
-        self.day = existing?.date ?? day
+        self.day = target.existing?.date ?? day
         lessonID = target.existing?.lessonID ?? target.lessonID
         _subjectID = State(initialValue: target.existing?.subjectID ?? target.subjectID)
         _text = State(initialValue: target.existing?.text ?? "")
@@ -393,18 +444,21 @@ struct NoteEditor: View {
                         LabeledContent("Class", value: store.subject(for: subjectID).name)
                     }
                 }
+                .listRowBackground(Theme.surface)
 
                 Section("Notes") {
                     TextField("What did you cover? What do you need to go over?",
                               text: $text, axis: .vertical)
                         .lineLimit(5...12)
                 }
+                .listRowBackground(Theme.surface)
 
                 Section {
                     Toggle("Needs review", isOn: $needsReview)
                 } footer: {
                     Text("Notes that need review appear in your Review list until you tick them off.")
                 }
+                .listRowBackground(Theme.surface)
 
                 if existing != nil {
                     Section {
@@ -412,8 +466,10 @@ struct NoteEditor: View {
                             confirmingDelete = true
                         }
                     }
+                    .listRowBackground(Theme.surface)
                 }
             }
+            .themedList()
             .navigationTitle(existing == nil ? "New Note" : "Edit Note")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

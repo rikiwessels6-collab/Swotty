@@ -17,6 +17,7 @@ struct SubjectsListView: View {
             } footer: {
                 Text("Quickly add or remove subjects like Italian, Drama or Digital Technologies.")
             }
+            .listRowBackground(Theme.surface)
 
             Section {
                 ForEach(store.subjects) { subject in
@@ -44,7 +45,9 @@ struct SubjectsListView: View {
             } footer: {
                 Text("Tap a subject to edit it. Deleting a subject moves its assessments to Other. Other can't be deleted.")
             }
+            .listRowBackground(Theme.surface)
         }
+        .themedList()
         .navigationTitle("Subjects")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
@@ -105,6 +108,7 @@ struct SubjectEditor: View {
                         .multilineTextAlignment(.center)
                         .font(.title3)
                 }
+                .listRowBackground(Theme.surface)
 
                 Section("Colour") {
                     LazyVGrid(columns: grid, spacing: 12) {
@@ -123,6 +127,7 @@ struct SubjectEditor: View {
                     }
                     .padding(.vertical, 6)
                 }
+                .listRowBackground(Theme.surface)
 
                 Section("Icon") {
                     LazyVGrid(columns: grid, spacing: 12) {
@@ -137,7 +142,9 @@ struct SubjectEditor: View {
                     }
                     .padding(.vertical, 6)
                 }
+                .listRowBackground(Theme.surface)
             }
+            .themedList()
             .navigationTitle(existing == nil ? "New Subject" : "Edit Subject")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -194,6 +201,7 @@ struct SubjectLibraryView: View {
                         .disabled(subject.id == Subject.otherID)
                     }
                 }
+                .listRowBackground(Theme.surface)
             }
 
             Section {
@@ -201,7 +209,9 @@ struct SubjectLibraryView: View {
             } footer: {
                 Text("Senior (Year 11–12) subjects aren't listed here. Add them with + on the Subjects screen.")
             }
+            .listRowBackground(Theme.surface)
         }
+        .themedList()
         .navigationTitle("Subject Library")
     }
 

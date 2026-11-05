@@ -43,6 +43,7 @@ struct AssessmentEditor: View {
                     TextField("Topics to revise, page numbers…", text: $draft.notes, axis: .vertical)
                         .lineLimit(3...6)
                 }
+                .listRowBackground(Theme.surface)
 
                 if existing != nil {
                     Section {
@@ -50,8 +51,10 @@ struct AssessmentEditor: View {
                             confirmingDelete = true
                         }
                     }
+                    .listRowBackground(Theme.surface)
                 }
             }
+            .themedList()
             .navigationTitle(existing == nil ? "New Assessment" : "Edit Assessment")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -97,6 +100,7 @@ struct AssessmentEditor: View {
                 Toggle("Completed", isOn: $draft.isCompleted)
             }
         }
+        .listRowBackground(Theme.surface)
     }
 
     private var dueSection: some View {
@@ -114,6 +118,7 @@ struct AssessmentEditor: View {
                 Text("Reminder at \(ReminderScheduler.label(forHour: ReminderScheduler.reminderHour)). Change the time in Settings.")
             }
         }
+        .listRowBackground(Theme.surface)
     }
 
     private var stepsSection: some View {
@@ -156,6 +161,7 @@ struct AssessmentEditor: View {
         } footer: {
             Text("Break big tasks into small steps. Swipe a step left to delete it.")
         }
+        .listRowBackground(Theme.surface)
     }
 
     private var resultSection: some View {
@@ -203,6 +209,7 @@ struct AssessmentEditor: View {
         } footer: {
             Text("Add your mark or grade once it's been marked. Weight is how much it counts towards the subject average: 1 is normal, 2 counts double.")
         }
+        .listRowBackground(Theme.surface)
     }
 
     // ---- Actions ----

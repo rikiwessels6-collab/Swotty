@@ -2,24 +2,28 @@ import SwiftUI
 
 // MARK: - Colours and icons for subjects
 enum SubjectColour: String, CaseIterable, Identifiable, Codable {
+    case gold, emerald
     case red, orange, yellow, green, mint, teal, blue, indigo, purple, pink, brown, grey
 
     var id: String { rawValue }
 
+    // A refined palette: deeper, slightly muted tones that sit well on navy and ivory.
     var color: Color {
         switch self {
-        case .red: return .red
-        case .orange: return .orange
-        case .yellow: return .yellow
-        case .green: return .green
-        case .mint: return .mint
-        case .teal: return .teal
-        case .blue: return .blue
-        case .indigo: return .indigo
-        case .purple: return .purple
-        case .pink: return .pink
-        case .brown: return .brown
-        case .grey: return .gray
+        case .gold: return Theme.gold
+        case .emerald: return Theme.emerald
+        case .red: return Color(hex: 0xD1495B)
+        case .orange: return Color(hex: 0xE08E45)
+        case .yellow: return Color(hex: 0xE3B23C)
+        case .green: return Color(hex: 0x2FA77B)
+        case .mint: return Color(hex: 0x6CC4A1)
+        case .teal: return Color(hex: 0x2A9DA8)
+        case .blue: return Color(hex: 0x4C7DDB)
+        case .indigo: return Color(hex: 0x6B63D6)
+        case .purple: return Color(hex: 0x9A5FC0)
+        case .pink: return Color(hex: 0xD86BA0)
+        case .brown: return Color(hex: 0x9B7653)
+        case .grey: return Color(hex: 0x8591A5)
         }
     }
 }

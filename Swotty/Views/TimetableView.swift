@@ -1,11 +1,32 @@
 import SwiftUI
 
-// MARK: - Timetable (weekly lessons, Monday to Friday)
-struct TimetableView: View {
-    @EnvironmentObject private var store: StudyStore
-    @Binding var mode: ScheduleMode
+// MARK: - Weekly timetable editor
+// Where the repeating weekly lessons are added and changed.
+// Presented as a sheet from the Schedule tab (TimetableEditorSheet),
+// or pushed from Settings.
+struct TimetableEditorSheet: View {
+    @Environment(\.dismiss) private var dismiss
 
-    @State private var weekday = TimetableView.initialWeekday()
+    var body: some View {
+        NavigationStack {
+            TimetableEditorView()
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
+                            .bold()
+                    }
+                }
+        }
+    }
+}
+
+struct TimetableEditorView: View {
+    @EnvironmentObject private var store: StudyStore
+
+    @AppStorage(ScheduleSettings.showWeekendKey) private var showWeekend = false
+    @AppStorage(ScheduleSettings.weekStartKey) private var weekStart = 2
+
+    @State private var weekday = Calendar.current.component(.weekday, from: Date())
     @State private var editingLesson: Lesson? = nil
     @State private var showingAddSheet = false
     @State private var now = Date()
@@ -13,12 +34,8 @@ struct TimetableView: View {
     // Keeps the "Now" badge fresh.
     private let ticker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
-    private static let schoolDays = [2, 3, 4, 5, 6]
-
-    // Today if it's a school day, otherwise Monday.
-    private static func initialWeekday() -> Int {
-        let today = Calendar.current.component(.weekday, from: Date())
-        return schoolDays.contains(today) ? today : 2
+    private var days: [Int] {
+        ScheduleSettings.orderedDays(weekStart: weekStart, showWeekend: showWeekend)
     }
 
     private func dayName(_ weekday: Int) -> String {
@@ -30,80 +47,85 @@ struct TimetableView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    Picker("Day", selection: $weekday) {
-                        ForEach(Self.schoolDays, id: \.self) { day in
-                            Text(dayName(day)).tag(day)
-                        }
+        List {
+            Section {
+                Picker("Day", selection: $weekday) {
+                    ForEach(days, id: \.self) { day in
+                        Text(dayName(day)).tag(day)
                     }
-                    .pickerStyle(.segmented)
                 }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets())
+                .pickerStyle(.segmented)
+            }
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets())
 
-                if lessons.isEmpty {
-                    Section {
-                        VStack(spacing: 12) {
-                            EmptyStateView(icon: "calendar.badge.plus",
-                                           title: "No lessons on \(dayName(weekday))",
-                                           message: "Add your lessons to build your weekly timetable.")
-                            Button("Add a lesson") { showingAddSheet = true }
-                                .buttonStyle(.borderedProminent)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.bottom, 12)
+            if lessons.isEmpty {
+                Section {
+                    VStack(spacing: 12) {
+                        EmptyStateView(icon: "calendar.badge.plus",
+                                       title: "No lessons on \(dayName(weekday))",
+                                       message: "Add your lessons to build your weekly timetable.")
+                        Button("Add a lesson") { showingAddSheet = true }
+                            .buttonStyle(BrandButtonStyle())
                     }
-                } else {
-                    Section {
-                        ForEach(lessons) { lesson in
-                            lessonRow(lesson)
-                                .contentShape(Rectangle())
-                                .onTapGesture { editingLesson = lesson }
-                                .swipeActions(edge: .trailing) {
-                                    Button(role: .destructive) {
-                                        withAnimation { store.deleteLesson(lesson) }
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, 12)
+                }
+                .listRowBackground(Theme.surface)
+            } else {
+                Section {
+                    ForEach(lessons) { lesson in
+                        lessonRow(lesson)
+                            .contentShape(Rectangle())
+                            .onTapGesture { editingLesson = lesson }
+                            .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) {
+                                    withAnimation { store.deleteLesson(lesson) }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
                                 }
-                        }
-                    } footer: {
-                        Text("Tap a lesson to edit it. Swipe left to delete.")
+                            }
                     }
+                } footer: {
+                    Text("Tap a lesson to edit it. Swipe left to delete.")
                 }
+                .listRowBackground(Theme.surface)
             }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Timetable")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    ScheduleModePicker(mode: $mode)
+        }
+        .listStyle(.insetGrouped)
+        .themedList()
+        .navigationTitle("Weekly Timetable")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingAddSheet = true
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title2)
                 }
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingAddSheet = true
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
-                    }
-                    .accessibilityLabel("Add lesson")
-                }
+                .accessibilityLabel("Add lesson")
             }
-            .onReceive(ticker) { now = $0 }
-            .sheet(isPresented: $showingAddSheet) {
-                LessonEditor(existing: nil,
-                             defaultWeekday: weekday,
-                             defaultSubjectID: store.subjects.first?.id ?? Subject.otherID)
-                    .environmentObject(store)
+        }
+        .onAppear {
+            if !days.contains(weekday), let first = days.first {
+                weekday = first
             }
-            .sheet(item: $editingLesson) { lesson in
-                LessonEditor(existing: lesson,
-                             defaultWeekday: lesson.weekday,
-                             defaultSubjectID: lesson.subjectID)
-                    .environmentObject(store)
-            }
+        }
+        .onReceive(ticker) { now = $0 }
+        .sheet(isPresented: $showingAddSheet) {
+            LessonEditor(existing: nil,
+                         days: days,
+                         defaultWeekday: weekday,
+                         defaultSubjectID: store.subjects.first?.id ?? Subject.otherID)
+                .environmentObject(store)
+        }
+        .sheet(item: $editingLesson) { lesson in
+            LessonEditor(existing: lesson,
+                         days: days,
+                         defaultWeekday: lesson.weekday,
+                         defaultSubjectID: lesson.subjectID)
+                .environmentObject(store)
         }
     }
 
@@ -159,7 +181,10 @@ struct LessonEditor: View {
     @EnvironmentObject private var store: StudyStore
     @Environment(\.dismiss) private var dismiss
 
+    @AppStorage(ScheduleSettings.roundedTimesKey) private var roundedTimes = true
+
     let existing: Lesson?
+    let days: [Int]
 
     @State private var subjectID: String
     @State private var weekday: Int
@@ -170,8 +195,9 @@ struct LessonEditor: View {
     @State private var repeatDays: Set<Int>
     @State private var confirmingDelete = false
 
-    init(existing: Lesson?, defaultWeekday: Int, defaultSubjectID: String) {
+    init(existing: Lesson?, days: [Int], defaultWeekday: Int, defaultSubjectID: String) {
         self.existing = existing
+        self.days = days
         _repeatDays = State(initialValue: [existing?.weekday ?? defaultWeekday])
         _subjectID = State(initialValue: existing?.subjectID ?? defaultSubjectID)
         _weekday = State(initialValue: existing?.weekday ?? defaultWeekday)
@@ -183,6 +209,11 @@ struct LessonEditor: View {
 
     private var timesAreValid: Bool {
         Lesson.minutes(from: end) > Lesson.minutes(from: start)
+    }
+
+    // An existing lesson on a hidden weekend day stays selectable.
+    private var dayChoices: [Int] {
+        days.contains(weekday) ? days : days + [weekday]
     }
 
     var body: some View {
@@ -199,7 +230,7 @@ struct LessonEditor: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Days")
                             HStack(spacing: 8) {
-                                ForEach([2, 3, 4, 5, 6], id: \.self) { day in
+                                ForEach(days, id: \.self) { day in
                                     dayChip(day)
                                 }
                             }
@@ -207,12 +238,13 @@ struct LessonEditor: View {
                         .padding(.vertical, 4)
                     } else {
                         Picker("Day", selection: $weekday) {
-                            ForEach([2, 3, 4, 5, 6], id: \.self) { day in
+                            ForEach(dayChoices, id: \.self) { day in
                                 Text(Calendar.current.weekdaySymbols[day - 1]).tag(day)
                             }
                         }
                     }
                 }
+                .listRowBackground(Theme.surface)
 
                 Section {
                     DatePicker("Starts", selection: $start, displayedComponents: .hourAndMinute)
@@ -223,14 +255,18 @@ struct LessonEditor: View {
                     if !timesAreValid {
                         Text("The end time must be after the start time.")
                             .foregroundStyle(.red)
+                    } else if roundedTimes {
+                        Text("Times are rounded to the nearest 5 minutes. Change this in Settings.")
                     }
                 }
+                .listRowBackground(Theme.surface)
 
                 Section("Details (optional)") {
                     TextField("Room, e.g. R1.02", text: $room)
                     TextField("Teacher", text: $teacher)
                         .textContentType(.name)
                 }
+                .listRowBackground(Theme.surface)
 
                 if existing != nil {
                     Section {
@@ -238,8 +274,10 @@ struct LessonEditor: View {
                             confirmingDelete = true
                         }
                     }
+                    .listRowBackground(Theme.surface)
                 }
             }
+            .themedList()
             .navigationTitle(existing == nil ? "New Lesson" : "Edit Lesson")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -277,8 +315,8 @@ struct LessonEditor: View {
                 .bold()
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
-                .background(isOn ? AnyShapeStyle(TintShapeStyle()) : AnyShapeStyle(Color(.tertiarySystemFill)))
-                .foregroundStyle(isOn ? Color.white : Color.primary)
+                .background(isOn ? AnyShapeStyle(TintShapeStyle()) : AnyShapeStyle(Theme.surfaceRaised))
+                .foregroundStyle(isOn ? Theme.onAccent : Color.primary)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
@@ -287,8 +325,13 @@ struct LessonEditor: View {
     }
 
     private func save() {
-        let startMinutes = Lesson.minutes(from: start)
-        let endMinutes = Lesson.minutes(from: end)
+        var startMinutes = Lesson.minutes(from: start)
+        var endMinutes = Lesson.minutes(from: end)
+        if roundedTimes {
+            startMinutes = ScheduleSettings.rounded(startMinutes)
+            endMinutes = ScheduleSettings.rounded(endMinutes)
+            if endMinutes <= startMinutes { endMinutes = startMinutes + 5 }
+        }
         let roomText = room.trimmingCharacters(in: .whitespaces)
         let teacherText = teacher.trimmingCharacters(in: .whitespaces)
 

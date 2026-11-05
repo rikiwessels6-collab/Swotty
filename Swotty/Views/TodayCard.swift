@@ -59,7 +59,7 @@ struct TodayCard: View {
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground))
+        .background(Theme.surface)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .padding(.vertical, 4)
         .onReceive(ticker) { now = $0 }
