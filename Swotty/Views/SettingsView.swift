@@ -14,6 +14,7 @@ struct SettingsView: View {
     @State private var showingAccessDenied = false
     @State private var confirmingSyncOff = false
     @State private var confirmingClear = false
+    @State private var confirmingRemoveDemo = false
 
     private var completedCount: Int {
         store.items.filter { $0.isCompleted }.count
@@ -111,6 +112,16 @@ struct SettingsView: View {
                     Text("Adds each assessment as an all-day event in a \"\(appName)\" calendar in the Calendar app. Changes here update the calendar automatically.")
                 }
 
+                if store.hasDemoData {
+                    Section {
+                        Button("Remove Demo Data", role: .destructive) {
+                            confirmingRemoveDemo = true
+                        }
+                    } footer: {
+                        Text("Removes the sample assessments and lessons added when you started with demo data. Your own entries are kept.")
+                    }
+                }
+
                 Section {
                     Button("Clear Completed (\(completedCount))", role: .destructive) {
                         confirmingClear = true
@@ -148,6 +159,13 @@ struct SettingsView: View {
                 Button("Stop but Keep Events") {
                     CalendarSync.shared.setEnabled(false)
                     calendarSyncOn = false
+                }
+            }
+            .confirmationDialog("Remove the demo data?",
+                                isPresented: $confirmingRemoveDemo,
+                                titleVisibility: .visible) {
+                Button("Remove Demo Data", role: .destructive) {
+                    withAnimation { store.removeDemoData() }
                 }
             }
             .confirmationDialog("Clear \(completedCount) completed assessments?",

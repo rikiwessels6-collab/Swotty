@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - Calendar tab
 struct MonthCalendarView: View {
     @EnvironmentObject private var store: StudyStore
+    @Binding var mode: ScheduleMode
 
     @State private var month = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? Date()
     @State private var selectedDay = Calendar.current.startOfDay(for: Date())
@@ -50,7 +51,11 @@ struct MonthCalendarView: View {
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Calendar")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    ScheduleModePicker(mode: $mode)
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         showingAddSheet = true
