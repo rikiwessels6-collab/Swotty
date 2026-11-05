@@ -28,12 +28,11 @@ Repository → **Settings → Secrets and variables → Actions → New reposito
 | `APPLE_TEAM_ID` | 10-character Team ID (developer.apple.com → Membership details) |
 | `ASC_KEY_ID` | Key ID from step 2 |
 | `ASC_ISSUER_ID` | Issuer ID from step 2 |
-| `ASC_KEY_P8_BASE64` | The `.p8` file's contents, base64-encoded (see below) |
+| `ASC_KEY_P8` | The full text of the `.p8` file, including the `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` lines |
 
-Base64-encoding the key without a Mac: open the `.p8` in any text editor,
-copy everything (including the BEGIN/END lines), and paste it into a
-base64 encoder such as https://www.base64encode.org (Encode, UTF-8, keep line
-breaks). Paste the result as the secret.
+To get the key text on an iPad: open the downloaded `.p8` in the Files app
+(tap it, or long-press → Quick Look), select all, copy, and paste it into the
+secret's value box. Don't paste the key into any website or chat.
 
 ## Each build
 1. GitHub → **Actions → Upload to TestFlight → Run workflow**.
