@@ -1,0 +1,11 @@
+.DS_Store
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcodeproj/
+*.xcworkspace/
+.swiftpm/
+*.ipa
+*.dSYM.zip
+Swotty/Resources/Info.plist
