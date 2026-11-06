@@ -120,15 +120,26 @@ final class StudyStore: ObservableObject {
         refreshExtras(for: item.id)
     }
 
-    func delete(_ item: Assessment) {
+    // The last thing deleted, kept briefly so it can be brought back.
+    @Published var recentlyDeleted: Assessment? = nil
+
+    func delete(_ item: Assessment, undoable: Bool = true) {
         ReminderScheduler.cancel(item)
         CalendarSync.shared.remove(item)
         items.removeAll { $0.id == item.id }
+        recentlyDeleted = undoable ? item : nil
+    }
+
+    func undoDelete() {
+        guard let item = recentlyDeleted else { return }
+        recentlyDeleted = nil
+        add(item)
     }
 
     func toggleCompleted(_ item: Assessment) {
         guard let i = index(of: item.id) else { return }
         items[i].isCompleted.toggle()
+        if items[i].isCompleted { Haptics.success() }
         refreshExtras(for: item.id)
     }
 
@@ -145,7 +156,7 @@ final class StudyStore: ObservableObject {
     }
 
     func clearCompleted() {
-        items.filter { $0.isCompleted }.forEach { delete($0) }
+        items.filter { $0.isCompleted }.forEach { delete($0, undoable: false) }
     }
 
     // Updates the reminder and the calendar event for one item.

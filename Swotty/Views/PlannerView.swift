@@ -8,6 +8,7 @@ struct PlannerView: View {
 
     @State private var subjectFilter: String? = nil   // nil means "All"
     @State private var showingAddSheet = false
+    @State private var showingQuickAdd = false
     @State private var editingItem: Assessment? = nil
     @State private var showCompleted = false
 
@@ -155,6 +156,14 @@ struct PlannerView: View {
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets())
 
+                if InsightsCard.hasContent(store.items) {
+                    Section {
+                        InsightsCard()
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                }
+
                 Section {
                     subjectFilterBar
                 }
@@ -196,6 +205,51 @@ struct PlannerView: View {
             }
             .listStyle(.insetGrouped)
             .themedList()
+            .overlay(alignment: .bottomTrailing) {
+                Button {
+                    Haptics.tap()
+                    showingQuickAdd = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(Theme.onAccent)
+                        .frame(width: 58, height: 58)
+                        .background(Theme.gold)
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+                }
+                .padding(20)
+                .accessibilityLabel("Quick add")
+                .accessibilityHint("Adds a task or assessment from a short sentence")
+            }
+            .overlay(alignment: .bottom) {
+                if let deleted = store.recentlyDeleted {
+                    HStack {
+                        Text("Deleted \u{201C}\(deleted.title)\u{201D}")
+                            .lineLimit(1)
+                        Spacer()
+                        Button("Undo") { withAnimation { store.undoDelete() } }
+                            .bold()
+                            .foregroundStyle(Theme.gold)
+                    }
+                    .padding()
+                    .background(Theme.surfaceRaised)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .padding(.horizontal)
+                    .padding(.bottom, 88)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .task(id: deleted.id) {
+                        try? await Task.sleep(nanoseconds: 6_000_000_000)
+                        if store.recentlyDeleted?.id == deleted.id {
+                            withAnimation { store.recentlyDeleted = nil }
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $showingQuickAdd) {
+                QuickAddSheet(defaultSubjectID: subjectFilter ?? store.subjects.first?.id ?? Subject.otherID)
+                    .environmentObject(store)
+            }
             .task { await refreshNotificationStatus() }
             .sheet(isPresented: $showingReview) {
                 ReviewNotesView()

@@ -19,6 +19,19 @@ enum ReminderScheduler {
         cancel(item)
         guard let daysBefore = item.reminderDaysBefore, !item.isCompleted else { return }
 
+        let title = "\(subject.name) \(item.type.rawValue.lowercased())"
+        let early = daysBefore == 1
+            ? "\(item.title) is due tomorrow."
+            : "\(item.title) is due in \(daysBefore) days."
+        post(item, daysBefore: daysBefore, id: item.id.uuidString, title: title, body: early)
+        // A second nudge on the morning it is due.
+        if daysBefore > 0 {
+            post(item, daysBefore: 0, id: item.id.uuidString + "-today", title: title,
+                 body: "\(item.title) is due today.")
+        }
+    }
+
+    private static func post(_ item: Assessment, daysBefore: Int, id: String, title: String, body: String) {
         let calendar = Calendar.current
         guard let day = calendar.date(byAdding: .day, value: -daysBefore,
                                       to: calendar.startOfDay(for: item.dueDate)),
@@ -26,20 +39,19 @@ enum ReminderScheduler {
               fireDate > Date() else { return }
 
         let content = UNMutableNotificationContent()
-        content.title = "\(subject.name) \(item.type.rawValue.lowercased())"
-        content.body = daysBefore == 1
-            ? "\(item.title) is due tomorrow."
-            : "\(item.title) is due in \(daysBefore) days."
+        content.title = title
+        content.body = body
         content.sound = .default
 
         let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
         let trigger = UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)
-        add(UNNotificationRequest(identifier: item.id.uuidString, content: content, trigger: trigger))
+        add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
     }
 
     static func cancel(_ item: Assessment) {
         UNUserNotificationCenter.current()
-            .removePendingNotificationRequests(withIdentifiers: [item.id.uuidString])
+            .removePendingNotificationRequests(withIdentifiers: [item.id.uuidString,
+                                                                  item.id.uuidString + "-today"])
     }
 
     // ---- Focus timer ----
