@@ -11,9 +11,10 @@ struct Lesson: Identifiable, Codable, Equatable {
     var teacher = ""
     var isDemo = false        // added by "Start with demo data"
     var week = 0              // 0 = every week, 1 = Week A only, 2 = Week B only
+    var period = 0            // 0 = a custom time, otherwise the class period number
 
     init(subjectID: String, weekday: Int, startMinutes: Int, endMinutes: Int,
-         room: String = "", teacher: String = "", isDemo: Bool = false, week: Int = 0) {
+         room: String = "", teacher: String = "", isDemo: Bool = false, week: Int = 0, period: Int = 0) {
         self.subjectID = subjectID
         self.weekday = weekday
         self.startMinutes = startMinutes
@@ -22,10 +23,11 @@ struct Lesson: Identifiable, Codable, Equatable {
         self.teacher = teacher
         self.isDemo = isDemo
         self.week = week
+        self.period = period
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, subjectID, weekday, startMinutes, endMinutes, room, teacher, isDemo, week
+        case id, subjectID, weekday, startMinutes, endMinutes, room, teacher, isDemo, week, period
     }
 
     // Missing values get sensible defaults so saved data always loads.
@@ -41,6 +43,7 @@ struct Lesson: Identifiable, Codable, Equatable {
         isDemo = try c.decodeIfPresent(Bool.self, forKey: .isDemo) ?? false
         let savedWeek = try c.decodeIfPresent(Int.self, forKey: .week) ?? 0
         week = (0...2).contains(savedWeek) ? savedWeek : 0
+        period = max(0, try c.decodeIfPresent(Int.self, forKey: .period) ?? 0)
     }
 
     // Does this lesson run in the given week? A nil week means the

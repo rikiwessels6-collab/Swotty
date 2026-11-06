@@ -43,8 +43,8 @@ struct SwottyApp: App {
                     if phase == .active {
                         store.refreshClassReminders()
                     } else if phase == .background {
-                        // The widget reads the Calendar, so refresh it when leaving the app.
-                        WidgetCenter.shared.reloadAllTimelines()
+                        // Make sure the widget has the latest timetable when leaving the app.
+                        store.refreshWidget(immediately: true)
                     }
                 }
         }

@@ -220,7 +220,7 @@ struct AgendaView: View {
                 .frame(width: 4)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(subject.name)
+                Text(lesson.period > 0 ? "\(lesson.period)  \(subject.name)" : subject.name)
                     .font(.headline)
                 if !lesson.details.isEmpty {
                     Text(lesson.details)

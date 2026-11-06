@@ -26,6 +26,11 @@ targets:
       - path: Swotty
     dependencies:
       - target: SwottyWidget
+    entitlements:
+      path: Config/Swotty.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.boundaryline.swotty
     settings:
       base:
         # TODO: replace with the bundle ID registered in
@@ -68,6 +73,12 @@ targets:
     platform: iOS
     sources:
       - path: SwottyWidget
+      - path: Swotty/Shared
+    entitlements:
+      path: Config/SwottyWidget.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.boundaryline.swotty
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.boundaryline.swotty.widget

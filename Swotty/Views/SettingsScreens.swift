@@ -52,6 +52,7 @@ struct AppearanceSettingsView: View {
 
 // MARK: - Timetable & days
 struct ScheduleSettingsView: View {
+    @EnvironmentObject private var store: StudyStore
     @AppStorage(ScheduleSettings.showWeekendKey) private var showWeekend = false
     @AppStorage(ScheduleSettings.weekStartKey) private var weekStart = 2
     @AppStorage(ScheduleSettings.roundedTimesKey) private var roundedTimes = true
@@ -119,6 +120,16 @@ struct ScheduleSettingsView: View {
             .listRowBackground(Theme.surface)
 
             Section {
+                NavigationLink {
+                    PeriodsSettingsView()
+                } label: {
+                    HStack {
+                        Label("Class periods", systemImage: "list.number")
+                        Spacer()
+                        Text(store.periods.isEmpty ? "Off" : "\(store.periods.count) periods")
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 NavigationLink {
                     TimetableEditorView()
                 } label: {
@@ -421,5 +432,120 @@ struct AboutView: View {
         .themedList()
         .navigationTitle("About")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - Class periods
+// Set up the school day's bell times once (Period 1, 2, 3 …). Lessons placed in a
+// period take its times, and follow along if the times change.
+struct PeriodsSettingsView: View {
+    @EnvironmentObject private var store: StudyStore
+
+    @State private var firstStart = Lesson.date(forMinutes: 8 * 60)
+    @State private var length = 45
+    @State private var gap = 5
+    @State private var count = 6
+    @State private var confirmingCreate = false
+
+    var body: some View {
+        Form {
+            Section {
+                DatePicker("First period starts", selection: $firstStart, displayedComponents: .hourAndMinute)
+                Stepper("Lesson length: \(length) min", value: $length, in: 20...120, step: 5)
+                Stepper("Break between: \(gap) min", value: $gap, in: 0...60, step: 5)
+                Stepper("Number of periods: \(count)", value: $count, in: 1...12)
+                Button(store.periods.isEmpty ? "Create periods" : "Replace with these periods") {
+                    if store.periods.isEmpty {
+                        createPeriods()
+                    } else {
+                        confirmingCreate = true
+                    }
+                }
+            } header: {
+                Text("Quick set-up")
+            } footer: {
+                Text("Creates evenly spaced periods, for example 8:00–8:45, 8:50–9:35 and so on. You can adjust each one below.")
+            }
+            .listRowBackground(Theme.surface)
+
+            Section {
+                if store.periods.isEmpty {
+                    Text("No periods yet")
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(store.periods) { period in
+                    HStack(spacing: 8) {
+                        Text("Period \(period.number)")
+                            .font(.headline)
+                        Spacer()
+                        DatePicker("Start", selection: timeBinding(for: period, start: true),
+                                   displayedComponents: .hourAndMinute)
+                            .labelsHidden()
+                        Text("–")
+                        DatePicker("End", selection: timeBinding(for: period, start: false),
+                                   displayedComponents: .hourAndMinute)
+                            .labelsHidden()
+                    }
+                }
+                .onDelete { offsets in
+                    let remove = Set(offsets.map { store.periods[$0].id })
+                    store.setPeriods(store.periods.filter { !remove.contains($0.id) })
+                }
+
+                Button {
+                    addPeriod()
+                } label: {
+                    Label("Add a period", systemImage: "plus.circle.fill")
+                }
+            } header: {
+                Text("Periods")
+            } footer: {
+                Text("When you add a lesson, pick its period and its times follow. If the school changes its bell times, change them here and every lesson updates. Swipe a period to delete it; lessons in it keep their times.")
+            }
+            .listRowBackground(Theme.surface)
+        }
+        .themedList()
+        .navigationTitle("Class Periods")
+        .navigationBarTitleDisplayMode(.inline)
+        .confirmationDialog("Replace the current periods?", isPresented: $confirmingCreate,
+                            titleVisibility: .visible) {
+            Button("Replace", role: .destructive) { createPeriods() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Lessons keep their times, but ones in a period that no longer exists are set to a custom time.")
+        }
+    }
+
+    private func createPeriods() {
+        store.setPeriods(ClassPeriod.generate(firstStart: Lesson.minutes(from: firstStart),
+                                              length: length, gap: gap, count: count))
+    }
+
+    private func addPeriod() {
+        let nextNumber = (store.periods.map { $0.number }.max() ?? 0) + 1
+        let start = (store.periods.map { $0.endMinutes }.max() ?? Lesson.minutes(from: firstStart)) + gap
+        let end = min(start + length, 24 * 60 - 1)
+        store.setPeriods(store.periods + [ClassPeriod(number: nextNumber, startMinutes: min(start, end - 1), endMinutes: end)])
+    }
+
+    // Reads and writes one period's start or end time through the store.
+    private func timeBinding(for period: ClassPeriod, start: Bool) -> Binding<Date> {
+        Binding(
+            get: {
+                let current = store.periods.first { $0.id == period.id } ?? period
+                return Lesson.date(forMinutes: start ? current.startMinutes : current.endMinutes)
+            },
+            set: { newDate in
+                var all = store.periods
+                guard let index = all.firstIndex(where: { $0.id == period.id }) else { return }
+                let minutes = Lesson.minutes(from: newDate)
+                if start {
+                    all[index].startMinutes = minutes
+                } else {
+                    all[index].endMinutes = minutes
+                }
+                store.setPeriods(all)
+            }
+        )
     }
 }

@@ -250,12 +250,14 @@ struct LessonEditor: View {
     @State private var teacher: String
     @State private var repeatDays: Set<Int>
     @State private var lessonWeek: Int                  // 0 = every week, 1 = Week A, 2 = Week B
+    @State private var lessonPeriod: Int                // 0 = custom time, otherwise a period number
     @State private var confirmingDelete = false
 
     init(existing: Lesson?, days: [Int], defaultWeekday: Int, defaultWeek: Int = 0, defaultSubjectID: String) {
         self.existing = existing
         self.days = days
         _lessonWeek = State(initialValue: existing?.week ?? defaultWeek)
+        _lessonPeriod = State(initialValue: existing?.period ?? 0)
         _repeatDays = State(initialValue: [existing?.weekday ?? defaultWeekday])
         _subjectID = State(initialValue: existing?.subjectID ?? defaultSubjectID)
         _weekday = State(initialValue: existing?.weekday ?? defaultWeekday)
@@ -312,15 +314,33 @@ struct LessonEditor: View {
                 .listRowBackground(Theme.surface)
 
                 Section {
-                    DatePicker("Starts", selection: $start, displayedComponents: .hourAndMinute)
-                    DatePicker("Ends", selection: $end, displayedComponents: .hourAndMinute)
+                    if !store.periods.isEmpty {
+                        Picker("Period", selection: $lessonPeriod) {
+                            Text("Custom time").tag(0)
+                            ForEach(store.periods) { period in
+                                Text("Period \(period.number) · \(period.timeRange)").tag(period.number)
+                            }
+                        }
+                        .onChange(of: lessonPeriod) { newValue in
+                            if let period = store.period(number: newValue) {
+                                start = Lesson.date(forMinutes: period.startMinutes)
+                                end = Lesson.date(forMinutes: period.endMinutes)
+                            }
+                        }
+                    }
+                    if lessonPeriod == 0 || store.period(number: lessonPeriod) == nil {
+                        DatePicker("Starts", selection: $start, displayedComponents: .hourAndMinute)
+                        DatePicker("Ends", selection: $end, displayedComponents: .hourAndMinute)
+                    } else if let period = store.period(number: lessonPeriod) {
+                        LabeledContent("Times", value: period.timeRange)
+                    }
                 } header: {
                     Text("Time")
                 } footer: {
                     if !timesAreValid {
                         Text("The end time must be after the start time.")
                             .foregroundStyle(.red)
-                    } else if roundedTimes {
+                    } else if roundedTimes && lessonPeriod == 0 {
                         Text("Times are rounded to the nearest 5 minutes. Change this in Settings.")
                     }
                 }
@@ -392,7 +412,13 @@ struct LessonEditor: View {
     private func save() {
         var startMinutes = Lesson.minutes(from: start)
         var endMinutes = Lesson.minutes(from: end)
-        if roundedTimes {
+        var periodNumber = 0
+        if lessonPeriod > 0, let period = store.period(number: lessonPeriod) {
+            // A lesson in a period takes the period's times.
+            startMinutes = period.startMinutes
+            endMinutes = period.endMinutes
+            periodNumber = period.number
+        } else if roundedTimes {
             startMinutes = ScheduleSettings.rounded(startMinutes)
             endMinutes = ScheduleSettings.rounded(endMinutes)
             if endMinutes <= startMinutes { endMinutes = startMinutes + 5 }
@@ -407,6 +433,7 @@ struct LessonEditor: View {
             lesson.endMinutes = endMinutes
             lesson.room = roomText
             lesson.teacher = teacherText
+            lesson.period = periodNumber
             if timetableWeeks == 2 { lesson.week = lessonWeek }
             store.updateLesson(lesson)
         } else {
@@ -415,7 +442,8 @@ struct LessonEditor: View {
                 store.addLesson(Lesson(subjectID: subjectID, weekday: day,
                                        startMinutes: startMinutes, endMinutes: endMinutes,
                                        room: roomText, teacher: teacherText,
-                                       week: timetableWeeks == 2 ? lessonWeek : 0))
+                                       week: timetableWeeks == 2 ? lessonWeek : 0,
+                                       period: periodNumber))
             }
         }
         dismiss()

@@ -12,12 +12,13 @@ struct BackupFile: Codable {
     var items: [Assessment] = []
     var lessons: [Lesson] = []
     var notes: [ClassNote] = []
+    var periods: [ClassPeriod] = []
 
     static let currentVersion = 1
 
     init(version: Int = BackupFile.currentVersion, exportedAt: Date = Date(),
          studentName: String = "", subjects: [Subject] = [], items: [Assessment] = [],
-         lessons: [Lesson] = [], notes: [ClassNote] = []) {
+         lessons: [Lesson] = [], notes: [ClassNote] = [], periods: [ClassPeriod] = []) {
         self.version = version
         self.exportedAt = exportedAt
         self.studentName = studentName
@@ -25,10 +26,11 @@ struct BackupFile: Codable {
         self.items = items
         self.lessons = lessons
         self.notes = notes
+        self.periods = periods
     }
 
     enum CodingKeys: String, CodingKey {
-        case version, exportedAt, studentName, subjects, items, lessons, notes
+        case version, exportedAt, studentName, subjects, items, lessons, notes, periods
     }
 
     // Backups made before class notes existed have no "notes" entry.
@@ -41,6 +43,7 @@ struct BackupFile: Codable {
         items = try c.decodeIfPresent([Assessment].self, forKey: .items) ?? []
         lessons = try c.decodeIfPresent([Lesson].self, forKey: .lessons) ?? []
         notes = try c.decodeIfPresent([ClassNote].self, forKey: .notes) ?? []
+        periods = try c.decodeIfPresent([ClassPeriod].self, forKey: .periods) ?? []
     }
 
     func encoded() throws -> Data {

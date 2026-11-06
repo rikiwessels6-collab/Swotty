@@ -8,9 +8,10 @@ struct NoteTarget: Identifiable {
     var subjectID: String
 }
 
-// MARK: - Day view
-// One day at a time: the classes from the weekly timetable, the notes
-// taken in each class, and anything due that day.
+// MARK: - Day view (timeline)
+// One day as a timeline: week tabs along the top, times down the side, and a
+// coloured block for each class, sized to how long it is. Notes taken in a
+// class sit inside its block.
 // (The navigation stack and title come from ScheduleView.)
 struct DayView: View {
     @EnvironmentObject private var store: StudyStore
@@ -30,7 +31,12 @@ struct DayView: View {
     @State private var now = Date()
 
     private let ticker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
-    private var calendar: Calendar { Calendar.current }
+
+    private var calendar: Calendar {
+        var calendar = Calendar.current
+        calendar.firstWeekday = weekStart
+        return calendar
+    }
 
     private var weekday: Int { calendar.component(.weekday, from: day) }
     private var visibleDays: [Int] {
@@ -76,39 +82,33 @@ struct DayView: View {
             .sorted { !$0.isCompleted && $1.isCompleted }
     }
 
+    // The days of the week that contains the day shown.
+    private var weekDates: [Date] {
+        let start = calendar.dateInterval(of: .weekOfYear, for: day)?.start ?? day
+        return (0..<7)
+            .compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
+            .filter { visibleDays.contains(calendar.component(.weekday, from: $0)) }
+    }
+
     var body: some View {
-        List {
-            dateHeader
-
-            if !subjectFilter.isEmpty {
-                filterBanner
-            }
-
-            if !dueToday.isEmpty {
-                Section("Due this day") {
-                    ForEach(dueToday) { item in
-                        AssessmentRow(item: item, subject: store.subject(for: item)) {
-                            withAnimation { store.toggleCompleted(item) }
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture { editingItem = item }
-                    }
+        ScrollView {
+            VStack(spacing: 18) {
+                weekTabs
+                dateHeader
+                if !subjectFilter.isEmpty {
+                    filterBanner
                 }
-                .listRowBackground(Theme.surface)
-            }
-
-            if lessons.isEmpty {
-                emptyDay
-            } else {
-                ForEach(lessons) { lesson in
-                    lessonSection(lesson)
+                timeline
+                if !dueToday.isEmpty {
+                    dueCard
                 }
+                notesCard
             }
-
-            otherNotesSection
+            .padding()
+            .frame(maxWidth: 700)
+            .frame(maxWidth: .infinity)
         }
-        .listStyle(.insetGrouped)
-        .themedList()
+        .themedScreen()
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
@@ -152,9 +152,46 @@ struct DayView: View {
         }
     }
 
+    // ---- Week tabs: Mon Tue Wed … with the date ----
+    private var weekTabs: some View {
+        HStack(spacing: 4) {
+            ForEach(weekDates, id: \.self) { date in
+                let isSelected = calendar.isDate(date, inSameDayAs: day)
+                let isToday = calendar.isDateInToday(date)
+                Button {
+                    withAnimation { day = calendar.startOfDay(for: date) }
+                } label: {
+                    VStack(spacing: 2) {
+                        Text(date.formatted(.dateTime.weekday(.abbreviated)))
+                            .font(.caption.weight(.semibold))
+                        Text(date.formatted(.dateTime.day()))
+                            .font(.headline)
+                        Circle()
+                            .fill(isToday ? (isSelected ? Theme.onAccent : Theme.gold) : Color.clear)
+                            .frame(width: 5, height: 5)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(isSelected ? AnyShapeStyle(TintShapeStyle()) : AnyShapeStyle(Color.clear))
+                    )
+                    .foregroundStyle(isSelected ? Theme.onAccent : Color.primary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(date.formatted(.dateTime.weekday(.wide).day().month(.wide)))
+            }
+        }
+        .padding(6)
+        .background(Theme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .strokeBorder(Theme.hairline, lineWidth: 1))
+    }
+
     // ---- Header with previous / next day ----
     private var dateHeader: some View {
-        Section {
+        VStack(spacing: 8) {
             HStack {
                 Button {
                     shift(by: -1)
@@ -163,7 +200,6 @@ struct DayView: View {
                         .font(.title3)
                         .frame(width: 44, height: 44)
                 }
-                .buttonStyle(.borderless)
                 .accessibilityLabel("Previous day")
 
                 Spacer()
@@ -189,7 +225,6 @@ struct DayView: View {
                         .font(.title3)
                         .frame(width: 44, height: 44)
                 }
-                .buttonStyle(.borderless)
                 .accessibilityLabel("Next day")
             }
 
@@ -198,43 +233,140 @@ struct DayView: View {
                     withAnimation { day = calendar.startOfDay(for: Date()) }
                 }
                 .font(.subheadline)
-                .frame(maxWidth: .infinity)
             }
         }
-        .listRowBackground(Theme.surface)
     }
 
     private var filterBanner: some View {
-        Section {
-            HStack {
-                Label("Showing \(store.subject(for: subjectFilter).name) only",
-                      systemImage: "line.3.horizontal.decrease.circle.fill")
-                    .font(.subheadline)
-                Spacer()
-                Button("Clear") { subjectFilter = "" }
-                    .font(.subheadline)
-                    .buttonStyle(.borderless)
+        HStack {
+            Label("Showing \(store.subject(for: subjectFilter).name) only",
+                  systemImage: "line.3.horizontal.decrease.circle.fill")
+                .font(.subheadline)
+            Spacer()
+            Button("Clear") { subjectFilter = "" }
+                .font(.subheadline)
+        }
+        .card()
+    }
+
+    // ---- The timeline ----
+    private var timeline: some View {
+        VStack(spacing: 0) {
+            if lessons.isEmpty {
+                emptyDay
+            } else {
+                ForEach(Array(lessons.enumerated()), id: \.element.id) { index, lesson in
+                    if index > 0 {
+                        gap(from: lessons[index - 1], to: lesson)
+                    }
+                    lessonBlock(lesson)
+                }
             }
         }
-        .listRowBackground(Theme.surface)
+    }
+
+    // Space between two classes, with a label for a longer break.
+    private func gap(from previous: Lesson, to next: Lesson) -> some View {
+        let minutes = max(next.startMinutes - previous.endMinutes, 0)
+        let height = min(max(CGFloat(minutes) * 0.8, 10), 52)
+        return ZStack {
+            Color.clear
+            if minutes >= 15 {
+                Text("\(minutes) min break")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(height: height)
+    }
+
+    private func lessonBlock(_ lesson: Lesson) -> some View {
+        let subject = store.subject(for: lesson.subjectID)
+        let isNow = calendar.isDateInToday(day) && lesson.isOnNow(at: now)
+        let lessonNotes = notes(for: lesson)
+        // Longer classes get taller blocks.
+        let height = max(CGFloat(lesson.endMinutes - lesson.startMinutes) * 2.0, 96)
+
+        return HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .trailing, spacing: 0) {
+                Text(Lesson.label(forMinutes: lesson.startMinutes))
+                    .font(.caption.weight(.semibold))
+                Spacer(minLength: 4)
+                Text(Lesson.label(forMinutes: lesson.endMinutes))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: 62, alignment: .trailing)
+
+            Capsule()
+                .fill(subject.color)
+                .frame(width: 4)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .center, spacing: 8) {
+                    if lesson.period > 0 {
+                        Text("\(lesson.period)")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(subject.color.prefersDarkText ? Theme.onAccent : Color.white)
+                            .frame(width: 22, height: 22)
+                            .background(Circle().fill(subject.color))
+                    }
+                    Text(subject.name)
+                        .font(.display(.title2))
+                    if isNow {
+                        Text("Now")
+                            .font(.caption2)
+                            .bold()
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(subject.color))
+                            .foregroundStyle(subject.color.prefersDarkText ? Theme.onAccent : Color.white)
+                    }
+                    Spacer(minLength: 0)
+                }
+
+                if !lesson.room.isEmpty {
+                    Text(lesson.room)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                if !lesson.teacher.isEmpty {
+                    Text(lesson.teacher)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                ForEach(lessonNotes) { note in
+                    noteRow(note)
+                }
+
+                Button {
+                    noteTarget = NoteTarget(lessonID: lesson.id, subjectID: lesson.subjectID)
+                } label: {
+                    Label("Add a note", systemImage: "plus.circle")
+                        .font(.footnote)
+                }
+                .padding(.top, 2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(minHeight: height, alignment: .top)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var emptyDay: some View {
-        Section {
-            VStack(spacing: 12) {
-                EmptyStateView(
-                    icon: isDayOff ? "moon.zzz.fill" : "calendar.badge.plus",
-                    title: emptyTitle,
-                    message: emptyMessage)
-                if !isDayOff && subjectFilter.isEmpty {
-                    Button("Edit timetable") { onEditTimetable() }
-                        .buttonStyle(BrandButtonStyle())
-                }
+        VStack(spacing: 12) {
+            EmptyStateView(
+                icon: isDayOff ? "moon.zzz.fill" : "calendar.badge.plus",
+                title: emptyTitle,
+                message: emptyMessage)
+            if !isDayOff && subjectFilter.isEmpty {
+                Button("Edit timetable") { onEditTimetable() }
+                    .buttonStyle(BrandButtonStyle())
             }
-            .frame(maxWidth: .infinity)
-            .padding(.bottom, 8)
         }
-        .listRowBackground(Theme.surface)
+        .frame(maxWidth: .infinity)
+        .card()
     }
 
     private var emptyTitle: String {
@@ -249,68 +381,27 @@ struct DayView: View {
         return "Add your lessons to the weekly timetable to see them here."
     }
 
-    // ---- One class and its notes ----
-    private func lessonSection(_ lesson: Lesson) -> some View {
-        let subject = store.subject(for: lesson.subjectID)
-        let isNow = calendar.isDateInToday(day) && lesson.isOnNow(at: now)
-
-        return Section {
-            HStack(spacing: 12) {
-                Capsule()
-                    .fill(subject.color)
-                    .frame(width: 5)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        Text(subject.name)
-                            .font(.headline)
-                        if isNow {
-                            Text("Now")
-                                .font(.caption2)
-                                .bold()
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 2)
-                                .background(subject.color)
-                                .foregroundStyle(.white)
-                                .clipShape(Capsule())
-                        }
-                    }
-                    if !lesson.details.isEmpty {
-                        Text(lesson.details)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+    // ---- Due this day ----
+    private var dueCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Due this day")
+                .font(.display(.headline))
+            ForEach(dueToday) { item in
+                AssessmentRow(item: item, subject: store.subject(for: item)) {
+                    withAnimation { store.toggleCompleted(item) }
                 }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(Lesson.label(forMinutes: lesson.startMinutes))
-                        .font(.subheadline)
-                        .bold()
-                    Text(Lesson.label(forMinutes: lesson.endMinutes))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.vertical, 4)
-
-            ForEach(notes(for: lesson)) { note in
-                noteRow(note)
-            }
-
-            Button {
-                noteTarget = NoteTarget(lessonID: lesson.id, subjectID: lesson.subjectID)
-            } label: {
-                Label("Add a note", systemImage: "square.and.pencil")
+                .contentShape(Rectangle())
+                .onTapGesture { editingItem = item }
             }
         }
-        .listRowBackground(Theme.surface)
+        .card()
     }
 
-    private var otherNotesSection: some View {
-        Section {
+    // ---- Notes that aren't tied to a class ----
+    private var notesCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(lessons.isEmpty && otherNotes.isEmpty ? "Notes" : "Other notes")
+                .font(.display(.headline))
             ForEach(otherNotes) { note in
                 noteRow(note)
             }
@@ -320,20 +411,20 @@ struct DayView: View {
                                         : subjectFilter)
             } label: {
                 Label("Add a note for this day", systemImage: "square.and.pencil")
+                    .font(.subheadline)
             }
-        } header: {
-            Text(lessons.isEmpty && otherNotes.isEmpty ? "Notes" : "Other notes")
-        } footer: {
-            Text("Mark a note \"needs review\" and it stays in your Review list until you tick it off.")
+            Text("Mark a note \"needs review\" and it stays in your Review list until you tick it off. Touch and hold a note to delete it.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
-        .listRowBackground(Theme.surface)
+        .card()
     }
 
     // ---- A single note ----
     private func noteRow(_ note: ClassNote) -> some View {
         let subject = store.subject(for: note.subjectID)
 
-        return HStack(alignment: .top, spacing: 12) {
+        return HStack(alignment: .top, spacing: 10) {
             if note.needsReview {
                 Button {
                     withAnimation { store.toggleReviewed(note) }
@@ -342,7 +433,7 @@ struct DayView: View {
                         .font(.title3)
                         .foregroundStyle(note.isReviewed ? Theme.emerald : Color.orange)
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.plain)
                 .accessibilityLabel(note.isReviewed ? "Mark as not reviewed" : "Mark as reviewed")
             } else {
                 Image(systemName: "note.text")
@@ -352,7 +443,7 @@ struct DayView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(note.text)
-                    .font(.body)
+                    .font(.subheadline)
                     .foregroundStyle(note.isReviewed ? .secondary : .primary)
                     .strikethrough(note.isReviewed)
                 HStack(spacing: 6) {
@@ -370,15 +461,18 @@ struct DayView: View {
 
             Spacer(minLength: 0)
         }
+        .padding(10)
+        .background(Theme.surfaceRaised.opacity(0.6))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .contentShape(Rectangle())
         .onTapGesture {
             noteTarget = NoteTarget(existing: note, lessonID: note.lessonID, subjectID: note.subjectID)
         }
-        .swipeActions(edge: .trailing) {
+        .contextMenu {
             Button(role: .destructive) {
                 withAnimation { store.deleteNote(note) }
             } label: {
-                Label("Delete", systemImage: "trash")
+                Label("Delete Note", systemImage: "trash")
             }
         }
     }
