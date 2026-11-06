@@ -10,6 +10,8 @@ struct OnboardingView: View {
     @AppStorage(ScheduleSettings.showWeekendKey) private var showWeekend = false
     @AppStorage(ScheduleSettings.weekStartKey) private var weekStart = 2
     @AppStorage(ScheduleSettings.roundedTimesKey) private var roundedTimes = true
+    @AppStorage(ScheduleSettings.weeksKey) private var timetableWeeks = 1
+    @AppStorage(ScheduleSettings.weekAAnchorKey) private var weekAAnchor: Double = 0
 
     @State private var step = 0
     private let lastStep = 3
@@ -100,12 +102,42 @@ struct OnboardingView: View {
             card {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Week starts on")
-                    Picker("Week starts on", selection: $weekStart) {
+                    Picker("Week starts on", selection: Binding(
+                        get: { weekStart },
+                        set: { ScheduleSettings.setWeekStart($0) }
+                    )) {
                         ForEach(ScheduleSettings.weekStartChoices, id: \.day) { choice in
                             Text(choice.name).tag(choice.day)
                         }
                     }
                     .pickerStyle(.segmented)
+                }
+            }
+
+            card {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Timetable repeats")
+                    Picker("Timetable repeats", selection: Binding(
+                        get: { timetableWeeks },
+                        set: { ScheduleSettings.setTimetableWeeks($0) }
+                    )) {
+                        Text("Every week").tag(1)
+                        Text("Week A & B").tag(2)
+                    }
+                    .pickerStyle(.segmented)
+
+                    if timetableWeeks == 2 {
+                        Text("This week is")
+                            .padding(.top, 4)
+                        Picker("This week is", selection: Binding(
+                            get: { ScheduleSettings.weekType(for: Date(), anchor: weekAAnchor, weekStart: weekStart) },
+                            set: { ScheduleSettings.setCurrentWeekType($0) }
+                        )) {
+                            Text("Week A").tag(1)
+                            Text("Week B").tag(2)
+                        }
+                        .pickerStyle(.segmented)
+                    }
                 }
             }
         }
@@ -140,6 +172,7 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     summaryRow(icon: "calendar", text: showWeekend ? "Seven-day week" : "Monday to Friday")
                     summaryRow(icon: "arrow.right.circle", text: "Week starts on \(weekStartName)")
+                    summaryRow(icon: "arrow.2.squarepath", text: timetableWeeks == 2 ? "Week A & Week B timetable" : "Same timetable every week")
                     summaryRow(icon: "clock", text: roundedTimes ? "Times rounded to 5 minutes" : "Exact class times")
                 }
             }

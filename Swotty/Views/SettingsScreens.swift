@@ -55,12 +55,51 @@ struct ScheduleSettingsView: View {
     @AppStorage(ScheduleSettings.showWeekendKey) private var showWeekend = false
     @AppStorage(ScheduleSettings.weekStartKey) private var weekStart = 2
     @AppStorage(ScheduleSettings.roundedTimesKey) private var roundedTimes = true
+    @AppStorage(ScheduleSettings.weeksKey) private var timetableWeeks = 1
+    @AppStorage(ScheduleSettings.weekAAnchorKey) private var weekAAnchor: Double = 0
+
+    // Which week today falls in, for the "This week is" picker.
+    private var currentWeekType: Int {
+        ScheduleSettings.weekType(for: Date(), anchor: weekAAnchor, weekStart: weekStart)
+    }
 
     var body: some View {
         Form {
             Section {
+                Picker("Timetable repeats", selection: Binding(
+                    get: { timetableWeeks },
+                    set: { ScheduleSettings.setTimetableWeeks($0) }
+                )) {
+                    Text("Every week").tag(1)
+                    Text("Week A & Week B").tag(2)
+                }
+                if timetableWeeks == 2 {
+                    Picker("This week is", selection: Binding(
+                        get: { currentWeekType },
+                        set: { ScheduleSettings.setCurrentWeekType($0) }
+                    )) {
+                        Text("Week A").tag(1)
+                        Text("Week B").tag(2)
+                    }
+                    .pickerStyle(.segmented)
+                }
+            } header: {
+                Text("Weeks")
+            } footer: {
+                if timetableWeeks == 2 {
+                    Text("Weeks alternate every calendar week. If your school skips the rotation over a holiday, change \"This week is\" to match. Lessons can run in Week A, Week B or every week.")
+                } else {
+                    Text("Choose Week A & Week B if your timetable is different every second week.")
+                }
+            }
+            .listRowBackground(Theme.surface)
+
+            Section {
                 Toggle("Show the weekend", isOn: $showWeekend)
-                Picker("Week starts on", selection: $weekStart) {
+                Picker("Week starts on", selection: Binding(
+                    get: { weekStart },
+                    set: { ScheduleSettings.setWeekStart($0) }
+                )) {
                     ForEach(ScheduleSettings.weekStartChoices, id: \.day) { choice in
                         Text(choice.name).tag(choice.day)
                     }

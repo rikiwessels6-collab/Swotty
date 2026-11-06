@@ -88,6 +88,12 @@ struct ScheduleOptionsSheet: View {
     @AppStorage(ScheduleSettings.showWeekendKey) private var showWeekend = false
     @AppStorage(ScheduleSettings.weekStartKey) private var weekStart = 2
     @AppStorage(ScheduleSettings.subjectFilterKey) private var subjectFilter = ""
+    @AppStorage(ScheduleSettings.weeksKey) private var timetableWeeks = 1
+    @AppStorage(ScheduleSettings.weekAAnchorKey) private var weekAAnchor: Double = 0
+
+    private var currentWeekType: Int {
+        ScheduleSettings.weekType(for: Date(), anchor: weekAAnchor, weekStart: weekStart)
+    }
 
     var body: some View {
         NavigationStack {
@@ -117,9 +123,30 @@ struct ScheduleOptionsSheet: View {
                 }
                 .listRowBackground(Theme.surface)
 
+                if timetableWeeks == 2 {
+                    Section {
+                        Picker("This week is", selection: Binding(
+                            get: { currentWeekType },
+                            set: { ScheduleSettings.setCurrentWeekType($0) }
+                        )) {
+                            Text("Week A").tag(1)
+                            Text("Week B").tag(2)
+                        }
+                        .pickerStyle(.segmented)
+                    } header: {
+                        Text("Weeks")
+                    } footer: {
+                        Text("Use this if your school skips the Week A / Week B rotation over a holiday.")
+                    }
+                    .listRowBackground(Theme.surface)
+                }
+
                 Section("Days") {
                     Toggle("Show the weekend", isOn: $showWeekend)
-                    Picker("Week starts on", selection: $weekStart) {
+                    Picker("Week starts on", selection: Binding(
+                        get: { weekStart },
+                        set: { ScheduleSettings.setWeekStart($0) }
+                    )) {
                         ForEach(ScheduleSettings.weekStartChoices, id: \.day) { choice in
                             Text(choice.name).tag(choice.day)
                         }

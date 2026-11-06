@@ -20,6 +20,8 @@ struct DayView: View {
     @AppStorage(ScheduleSettings.showWeekendKey) private var showWeekend = false
     @AppStorage(ScheduleSettings.weekStartKey) private var weekStart = 2
     @AppStorage(ScheduleSettings.subjectFilterKey) private var subjectFilter = ""
+    @AppStorage(ScheduleSettings.weeksKey) private var timetableWeeks = 1
+    @AppStorage(ScheduleSettings.weekAAnchorKey) private var weekAAnchor: Double = 0
 
     @State private var noteTarget: NoteTarget? = nil
     @State private var editingItem: Assessment? = nil
@@ -40,8 +42,15 @@ struct DayView: View {
         subjectFilter.isEmpty || subjectID == subjectFilter
     }
 
+    // Week A or B for the day shown (nil when the timetable is the same every week).
+    private var weekType: Int? {
+        timetableWeeks == 2
+            ? ScheduleSettings.weekType(for: day, anchor: weekAAnchor, weekStart: weekStart)
+            : nil
+    }
+
     private var lessons: [Lesson] {
-        store.lessons(on: weekday).filter { matchesFilter($0.subjectID) }
+        store.lessons(on: weekday, week: weekType).filter { matchesFilter($0.subjectID) }
     }
 
     private var dayNotes: [ClassNote] {
@@ -165,6 +174,10 @@ struct DayView: View {
                     Text(day.formatted(.dateTime.day().month(.wide).year()))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                    if let weekType {
+                        WeekBadge(type: weekType)
+                            .padding(.top, 2)
+                    }
                 }
 
                 Spacer()

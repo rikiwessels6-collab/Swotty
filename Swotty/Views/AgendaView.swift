@@ -18,6 +18,15 @@ struct AgendaView: View {
     @AppStorage(ScheduleSettings.showWeekendKey) private var showWeekend = false
     @AppStorage(ScheduleSettings.weekStartKey) private var weekStart = 2
     @AppStorage(ScheduleSettings.subjectFilterKey) private var subjectFilter = ""
+    @AppStorage(ScheduleSettings.weeksKey) private var timetableWeeks = 1
+    @AppStorage(ScheduleSettings.weekAAnchorKey) private var weekAAnchor: Double = 0
+
+    // Week A or B for a date (nil when the timetable is the same every week).
+    private func weekType(for date: Date) -> Int? {
+        timetableWeeks == 2
+            ? ScheduleSettings.weekType(for: date, anchor: weekAAnchor, weekStart: weekStart)
+            : nil
+    }
 
     private var calendar: Calendar {
         var calendar = Calendar.current
@@ -108,6 +117,9 @@ struct AgendaView: View {
                 VStack(spacing: 2) {
                     Text(rangeLabel)
                         .font(.display(.title3))
+                    if span == .week, let first = dates.first, let type = weekType(for: first) {
+                        WeekBadge(type: type)
+                    }
                     if !subjectFilter.isEmpty {
                         Text("\(store.subject(for: subjectFilter).name) only")
                             .font(.caption)
@@ -140,7 +152,7 @@ struct AgendaView: View {
     // ---- One day ----
     private func daySection(_ date: Date) -> some View {
         let weekday = calendar.component(.weekday, from: date)
-        let lessons = store.lessons(on: weekday).filter { matches($0.subjectID) }
+        let lessons = store.lessons(on: weekday, week: weekType(for: date)).filter { matches($0.subjectID) }
         let due = store.items.filter {
             calendar.isDate($0.dueDate, inSameDayAs: date) && matches($0.subjectID)
         }
@@ -174,6 +186,9 @@ struct AgendaView: View {
                         .font(.display(.headline))
                     Text(date.formatted(.dateTime.day().month(.abbreviated)))
                         .foregroundStyle(.secondary)
+                    if let type = weekType(for: date) {
+                        WeekBadge(type: type)
+                    }
                     if isToday {
                         Text("Today")
                             .font(.caption2)

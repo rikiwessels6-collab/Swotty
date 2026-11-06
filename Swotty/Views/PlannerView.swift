@@ -18,11 +18,17 @@ struct PlannerView: View {
     // Starts as "authorized" so the card never flashes before we know.
     @State private var notificationStatus: UNAuthorizationStatus = .authorized
     @State private var showingReview = false
+    @AppStorage(ScheduleSettings.weeksKey) private var timetableWeeks = 1
+    @AppStorage(ScheduleSettings.weekAAnchorKey) private var weekAAnchor: Double = 0
+    @AppStorage(ScheduleSettings.weekStartKey) private var weekStartSetting = 2
 
     // Show today's class and review shortcut only when there's something to show.
     private var showTodayCard: Bool {
+        let week: Int? = timetableWeeks == 2
+            ? ScheduleSettings.weekType(for: Date(), anchor: weekAAnchor, weekStart: weekStartSetting)
+            : nil
         let weekday = Calendar.current.component(.weekday, from: Date())
-        return !store.lessons(on: weekday).isEmpty || !store.pendingReviewNotes.isEmpty
+        return !store.lessons(on: weekday, week: week).isEmpty || !store.pendingReviewNotes.isEmpty
     }
 
     private var showNotificationNudge: Bool {

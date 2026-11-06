@@ -25,7 +25,11 @@ struct TimetableEditorView: View {
 
     @AppStorage(ScheduleSettings.showWeekendKey) private var showWeekend = false
     @AppStorage(ScheduleSettings.weekStartKey) private var weekStart = 2
+    @AppStorage(ScheduleSettings.weeksKey) private var timetableWeeks = 1
+    @AppStorage(ScheduleSettings.weekAAnchorKey) private var weekAAnchor: Double = 0
 
+    @State private var viewedWeek = 1                    // 1 = Week A, 2 = Week B
+    @State private var pendingCopySource: Int? = nil     // week to copy from, awaiting confirmation
     @State private var weekday = Calendar.current.component(.weekday, from: Date())
     @State private var editingLesson: Lesson? = nil
     @State private var showingAddSheet = false
@@ -43,11 +47,25 @@ struct TimetableEditorView: View {
     }
 
     private var lessons: [Lesson] {
-        store.lessons(on: weekday)
+        store.lessons(on: weekday, week: timetableWeeks == 2 ? viewedWeek : nil)
     }
 
     var body: some View {
         List {
+            if timetableWeeks == 2 {
+                Section {
+                    Picker("Week", selection: $viewedWeek) {
+                        Text("Week A").tag(1)
+                        Text("Week B").tag(2)
+                    }
+                    .pickerStyle(.segmented)
+                } footer: {
+                    Text("Lessons marked \"Both weeks\" appear in each. Use the copy button to duplicate one week into the other.")
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
+            }
+
             Section {
                 Picker("Day", selection: $weekday) {
                     ForEach(days, id: \.self) { day in
@@ -97,6 +115,17 @@ struct TimetableEditorView: View {
         .navigationTitle("Weekly Timetable")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            if timetableWeeks == 2 {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button("Copy Week A to Week B") { pendingCopySource = 1 }
+                        Button("Copy Week B to Week A") { pendingCopySource = 2 }
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                    }
+                    .accessibilityLabel("Copy a week")
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     showingAddSheet = true
@@ -111,12 +140,32 @@ struct TimetableEditorView: View {
             if !days.contains(weekday), let first = days.first {
                 weekday = first
             }
+            if timetableWeeks == 2 {
+                viewedWeek = ScheduleSettings.weekType(for: Date(), anchor: weekAAnchor, weekStart: weekStart)
+            }
         }
         .onReceive(ticker) { now = $0 }
+        .confirmationDialog("Replace the lessons in the other week?",
+                            isPresented: Binding(get: { pendingCopySource != nil },
+                                                 set: { if !$0 { pendingCopySource = nil } }),
+                            titleVisibility: .visible) {
+            Button("Copy and Replace", role: .destructive) {
+                if let source = pendingCopySource {
+                    withAnimation { store.copyWeek(from: source, to: source == 1 ? 2 : 1) }
+                }
+                pendingCopySource = nil
+            }
+            Button("Cancel", role: .cancel) { pendingCopySource = nil }
+        } message: {
+            if let source = pendingCopySource {
+                Text("\(ScheduleSettings.weekLabel(source))'s lessons are copied to \(ScheduleSettings.weekLabel(source == 1 ? 2 : 1)). Lessons that only run in \(ScheduleSettings.weekLabel(source == 1 ? 2 : 1)) are replaced. \"Both weeks\" lessons are not changed.")
+            }
+        }
         .sheet(isPresented: $showingAddSheet) {
             LessonEditor(existing: nil,
                          days: days,
                          defaultWeekday: weekday,
+                         defaultWeek: timetableWeeks == 2 ? viewedWeek : 0,
                          defaultSubjectID: store.subjects.first?.id ?? Subject.otherID)
                 .environmentObject(store)
         }
@@ -124,6 +173,7 @@ struct TimetableEditorView: View {
             LessonEditor(existing: lesson,
                          days: days,
                          defaultWeekday: lesson.weekday,
+                         defaultWeek: lesson.week,
                          defaultSubjectID: lesson.subjectID)
                 .environmentObject(store)
         }
@@ -158,6 +208,11 @@ struct TimetableEditorView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
+                if timetableWeeks == 2 && lesson.week == 0 {
+                    Text("Both weeks")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Spacer()
@@ -182,6 +237,7 @@ struct LessonEditor: View {
     @Environment(\.dismiss) private var dismiss
 
     @AppStorage(ScheduleSettings.roundedTimesKey) private var roundedTimes = true
+    @AppStorage(ScheduleSettings.weeksKey) private var timetableWeeks = 1
 
     let existing: Lesson?
     let days: [Int]
@@ -193,11 +249,13 @@ struct LessonEditor: View {
     @State private var room: String
     @State private var teacher: String
     @State private var repeatDays: Set<Int>
+    @State private var lessonWeek: Int                  // 0 = every week, 1 = Week A, 2 = Week B
     @State private var confirmingDelete = false
 
-    init(existing: Lesson?, days: [Int], defaultWeekday: Int, defaultSubjectID: String) {
+    init(existing: Lesson?, days: [Int], defaultWeekday: Int, defaultWeek: Int = 0, defaultSubjectID: String) {
         self.existing = existing
         self.days = days
+        _lessonWeek = State(initialValue: existing?.week ?? defaultWeek)
         _repeatDays = State(initialValue: [existing?.weekday ?? defaultWeekday])
         _subjectID = State(initialValue: existing?.subjectID ?? defaultSubjectID)
         _weekday = State(initialValue: existing?.weekday ?? defaultWeekday)
@@ -224,6 +282,13 @@ struct LessonEditor: View {
                         ForEach(store.subjects) { subject in
                             Label(subject.name, systemImage: subject.icon)
                                 .tag(subject.id)
+                        }
+                    }
+                    if timetableWeeks == 2 {
+                        Picker("Runs in", selection: $lessonWeek) {
+                            Text("Every week").tag(0)
+                            Text("Week A").tag(1)
+                            Text("Week B").tag(2)
                         }
                     }
                     if existing == nil {
@@ -342,13 +407,15 @@ struct LessonEditor: View {
             lesson.endMinutes = endMinutes
             lesson.room = roomText
             lesson.teacher = teacherText
+            if timetableWeeks == 2 { lesson.week = lessonWeek }
             store.updateLesson(lesson)
         } else {
             // A new lesson can repeat on several days at once.
             for day in repeatDays.sorted() {
                 store.addLesson(Lesson(subjectID: subjectID, weekday: day,
                                        startMinutes: startMinutes, endMinutes: endMinutes,
-                                       room: roomText, teacher: teacherText))
+                                       room: roomText, teacher: teacherText,
+                                       week: timetableWeeks == 2 ? lessonWeek : 0))
             }
         }
         dismiss()

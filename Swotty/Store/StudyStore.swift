@@ -258,6 +258,32 @@ final class StudyStore: ObservableObject {
             .sorted { $0.startMinutes < $1.startMinutes }
     }
 
+    // Lessons on a weekday that run in the given week (nil = every week).
+    func lessons(on weekday: Int, week: Int?) -> [Lesson] {
+        lessons(on: weekday).filter { $0.runs(inWeek: week) }
+    }
+
+    // The lessons happening on a particular date, following Week A / Week B.
+    func lessons(onDate date: Date) -> [Lesson] {
+        let weekday = Calendar.current.component(.weekday, from: date)
+        return lessons(on: weekday, week: ScheduleSettings.weekType(on: date))
+    }
+
+    // Copies every lesson that runs only in one week into the other week,
+    // replacing whatever was only in the other week. "Every week" lessons are untouched.
+    func copyWeek(from source: Int, to target: Int) {
+        guard source != target, (1...2).contains(source), (1...2).contains(target) else { return }
+        let copies = lessons.filter { $0.week == source }.map { lesson -> Lesson in
+            var copy = lesson
+            copy.id = UUID()
+            copy.week = target
+            copy.isDemo = false
+            return copy
+        }
+        lessons.removeAll { $0.week == target }
+        lessons.append(contentsOf: copies)
+    }
+
     func addLesson(_ lesson: Lesson) {
         lessons.append(lesson)
     }

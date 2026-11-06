@@ -153,3 +153,18 @@ struct SoftButtonStyle: ButtonStyle {
             .opacity(configuration.isPressed ? 0.7 : 1)
     }
 }
+
+// A small "Week A" / "Week B" label.
+struct WeekBadge: View {
+    let type: Int   // 1 = Week A, 2 = Week B
+
+    var body: some View {
+        Text(ScheduleSettings.weekLabel(type))
+            .font(.caption2)
+            .bold()
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(type == 2 ? Theme.emerald : Theme.gold))
+            .foregroundStyle(Theme.onAccent)
+    }
+}

@@ -10,6 +10,7 @@ let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionS
 @main
 struct SwottyApp: App {
     @StateObject private var store = StudyStore()
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("appearance") private var appearance: AppearanceMode = .dark
     @AppStorage("accentColour") private var accent: SubjectColour = .gold
 
@@ -35,6 +36,13 @@ struct SwottyApp: App {
                 .environmentObject(store)
                 .preferredColorScheme(appearance.colorScheme)
                 .tint(accent.color)            // buttons, toggles, tab bar
+                .onChange(of: scenePhase) { phase in
+                    // Week A / Week B reminders are planned a fortnight ahead,
+                    // so top them up whenever the app comes back to the front.
+                    if phase == .active {
+                        store.refreshClassReminders()
+                    }
+                }
         }
     }
 }
