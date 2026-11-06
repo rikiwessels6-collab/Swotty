@@ -115,6 +115,21 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}"
 
+      # The archive is unsigned, which drops custom entitlements such as the App Group
+      # the widget uses to read the app's data. Stamp them back in (ad-hoc signing
+      # embeds entitlements); the export step re-signs everything properly for the
+      # App Store and keeps them.
+      - name: Embed entitlements in the archive
+        run: |
+          APP="$RUNNER_TEMP/Swotty.xcarchive/Products/Applications/Swotty.app"
+          ls Config
+          for appex in "$APP"/PlugIns/*.appex; do
+            codesign --force --sign - --timestamp=none --entitlements Config/SwottyWidget.entitlements "$appex"
+          done
+          codesign --force --sign - --timestamp=none --entitlements Config/Swotty.entitlements "$APP"
+          echo "--- entitlements now in the archive"
+          codesign -d --entitlements - "$APP" 2>&1 | head -20
+
       # Diagnostic only (never fails the build): exports a signed IPA and prints the
       # entitlements on the app and the widget, so we can see whether the shared
       # App Group made it into the signature.
