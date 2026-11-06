@@ -39,7 +39,9 @@ final class WeekABTests: XCTestCase {
         let wednesday = date(2026, 11, 11)   // in the week starting Monday 9 Nov
         let asB = ScheduleSettings.anchor(settingWeekOf: wednesday, to: 2, weekStart: 2, calendar: utc)
         XCTAssertEqual(ScheduleSettings.weekType(for: wednesday, anchor: asB, weekStart: 2, calendar: utc), 2)
-        XCTAssertEqual(ScheduleSettings.weekType(for: date(2026, 11, 18), anchor: asB, weekStart: 2, calendar: utc), 2)
+        // The weeks alternate from there: 11 Nov is B, so 18 Nov is A and 25 Nov is B again.
+        XCTAssertEqual(ScheduleSettings.weekType(for: date(2026, 11, 18), anchor: asB, weekStart: 2, calendar: utc), 1)
+        XCTAssertEqual(ScheduleSettings.weekType(for: date(2026, 11, 25), anchor: asB, weekStart: 2, calendar: utc), 2)
         XCTAssertEqual(ScheduleSettings.weekType(for: date(2026, 11, 4), anchor: asB, weekStart: 2, calendar: utc), 1)
 
         let asA = ScheduleSettings.anchor(settingWeekOf: wednesday, to: 1, weekStart: 2, calendar: utc)
