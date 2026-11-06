@@ -49,19 +49,10 @@ Open the failed run in Actions and read the step that went red. Common causes:
 a missing secret, a bundle ID that doesn't match the registered one, or the
 API key not having Admin access.
 
-## One-off: App Group for the widget
+## Optional: App Group for the widget
 
-The widgets read the app's own timetable through a shared "App Group". Apple only
-lets an App Group be registered by hand, not through the API key the build uses, so
-do this once in Safari at developer.apple.com → Account → Certificates, Identifiers
-& Profiles → Identifiers:
-
-1. **Create the group.** Tap **+**, choose **App Groups**, Continue. Description
-   "Swotty", Identifier exactly `group.com.boundaryline.swotty`. Continue → Register.
-2. **Add it to the app.** Back in Identifiers (make sure the filter says App IDs),
-   open `com.boundaryline.swotty`. Tick **App Groups**, tap **Configure**, tick
-   `group.com.boundaryline.swotty`, Continue → Save (confirm if asked about profiles).
-3. **Add it to the widget.** Open `com.boundaryline.swotty.widget` and do the same.
-
-Without this, the upload fails at "Export and upload" with "Authentication failed"
-and "No profiles for 'com.boundaryline.swotty' were found".
+Not needed for uploads. Without it the widgets read your Swotty calendar in Apple
+Calendar. Making them read the app's own timetable needs an App Group registered by
+hand at developer.apple.com (Identifiers, App Groups, `group.com.boundaryline.swotty`,
+then enabled on both App IDs) and the entitlement embedded in the archive. Without the
+registration the upload fails with "No profiles for 'com.boundaryline.swotty' were found".

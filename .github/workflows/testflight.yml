@@ -115,54 +115,6 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}"
 
-      # The archive is unsigned, which drops custom entitlements such as the App Group
-      # the widget uses to read the app's data. Stamp them back in (ad-hoc signing
-      # embeds entitlements); the export step re-signs everything properly for the
-      # App Store and keeps them.
-      - name: Embed entitlements in the archive
-        run: |
-          APP="$RUNNER_TEMP/Swotty.xcarchive/Products/Applications/Swotty.app"
-          ls Config
-          for appex in "$APP"/PlugIns/*.appex; do
-            codesign --force --sign - --timestamp=none --entitlements Config/SwottyWidget.entitlements "$appex"
-          done
-          codesign --force --sign - --timestamp=none --entitlements Config/Swotty.entitlements "$APP"
-          echo "--- entitlements now in the archive"
-          codesign -d --entitlements - "$APP" 2>&1 | head -20
-
-      # Diagnostic only (never fails the build): exports a signed IPA and prints the
-      # entitlements on the app and the widget, so we can see whether the shared
-      # App Group made it into the signature.
-      - name: Check signed entitlements
-        continue-on-error: true
-        run: |
-          cat > "$RUNNER_TEMP/ExportCheck.plist" <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key><string>app-store-connect</string>
-            <key>destination</key><string>export</string>
-            <key>teamID</key><string>${TEAM_ID}</string>
-            <key>signingStyle</key><string>automatic</string>
-          </dict>
-          </plist>
-          EOF
-          xcodebuild -exportArchive \
-            -archivePath "$RUNNER_TEMP/Swotty.xcarchive" \
-            -exportPath "$RUNNER_TEMP/export-check" \
-            -exportOptionsPlist "$RUNNER_TEMP/ExportCheck.plist" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_${ASC_KEY_ID}.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
-          mkdir -p "$RUNNER_TEMP/ipa"
-          unzip -q "$RUNNER_TEMP/export-check/Swotty.ipa" -d "$RUNNER_TEMP/ipa"
-          for bundle in "$RUNNER_TEMP"/ipa/Payload/Swotty.app "$RUNNER_TEMP"/ipa/Payload/Swotty.app/PlugIns/*.appex; do
-            echo "===== $bundle"
-            codesign -d --entitlements :- "$bundle" 2>&1 | head -40
-          done
-
       - name: Export and upload to App Store Connect
         run: |
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
