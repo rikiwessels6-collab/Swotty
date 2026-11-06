@@ -213,6 +213,9 @@ struct CalendarSettingsView: View {
     @State private var calendarSyncOn = CalendarSync.shared.isEnabled
     @State private var showingAccessDenied = false
     @State private var confirmingSyncOff = false
+    @State private var timetableOn = CalendarSync.shared.timetableEnabled
+    @State private var timetableUntil = CalendarSync.shared.timetableUntil
+    @State private var confirmingTimetableOff = false
 
     var body: some View {
         Form {
@@ -236,12 +239,46 @@ struct CalendarSettingsView: View {
                 Text("Adds each assessment as an all-day event in a \"\(appName)\" calendar in the Calendar app. Changes here update the calendar automatically.")
             }
             .listRowBackground(Theme.surface)
+
+            Section {
+                Toggle("Add timetable to Calendar", isOn: Binding(
+                    get: { timetableOn },
+                    set: { turnOn in
+                        if turnOn {
+                            enableTimetableSync()
+                        } else {
+                            confirmingTimetableOff = true
+                        }
+                    }
+                ))
+                if timetableOn {
+                    DatePicker("Repeat until", selection: Binding(
+                        get: { timetableUntil },
+                        set: { newDate in
+                            timetableUntil = newDate
+                            CalendarSync.shared.setTimetableUntil(newDate)
+                            CalendarSync.shared.scheduleTimetableSync()
+                        }
+                    ), in: Date()..., displayedComponents: .date)
+                    Button("Sync Now") {
+                        CalendarSync.shared.updateTimetableSource(lessons: store.lessons, subjects: store.subjects)
+                        CalendarSync.shared.syncTimetableNow()
+                    }
+                }
+            } header: {
+                Text("Timetable")
+            } footer: {
+                Text("Adds every class as a repeating event in a \"\(CalendarSync.timetableCalendarTitle)\" calendar, so your whole timetable shows in the Calendar app. Week A and Week B lessons repeat every second week. It stays up to date as you change lessons, and the Swotty widget uses it too. Pick the last day of term for \"Repeat until\".")
+            }
+            .listRowBackground(Theme.surface)
         }
         .themedList()
         .navigationTitle("Calendar Sync")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             calendarSyncOn = CalendarSync.shared.isEnabled
+            timetableOn = CalendarSync.shared.timetableEnabled
+            timetableUntil = CalendarSync.shared.timetableUntil
         }
         .alert("Calendar access is off", isPresented: $showingAccessDenied) {
             Button("OK", role: .cancel) {}
@@ -258,6 +295,33 @@ struct CalendarSettingsView: View {
             Button("Stop but Keep Events") {
                 CalendarSync.shared.setEnabled(false)
                 calendarSyncOn = false
+            }
+        }
+        .confirmationDialog("Stop adding the timetable to Calendar?", isPresented: $confirmingTimetableOff,
+                            titleVisibility: .visible) {
+            Button("Stop and Remove Timetable Events", role: .destructive) {
+                CalendarSync.shared.setTimetableEnabled(false)
+                CalendarSync.shared.removeTimetableEvents(deleteCalendar: true)
+                timetableOn = false
+            }
+            Button("Stop but Keep Events") {
+                CalendarSync.shared.setTimetableEnabled(false)
+                timetableOn = false
+            }
+        }
+    }
+
+    private func enableTimetableSync() {
+        CalendarSync.shared.requestAccess { granted in
+            if granted {
+                CalendarSync.shared.setTimetableEnabled(true)
+                CalendarSync.shared.setTimetableUntil(timetableUntil)
+                CalendarSync.shared.updateTimetableSource(lessons: store.lessons, subjects: store.subjects)
+                timetableOn = true
+                CalendarSync.shared.syncTimetableNow()
+            } else {
+                timetableOn = false
+                showingAccessDenied = true
             }
         }
     }

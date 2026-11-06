@@ -24,6 +24,8 @@ targets:
     platform: iOS
     sources:
       - path: Swotty
+    dependencies:
+      - target: SwottyWidget
     settings:
       base:
         # TODO: replace with the bundle ID registered in
@@ -60,6 +62,35 @@ targets:
           Swotty adds your assessment due dates to a Swotty calendar so you
           can see them in the Calendar app.
         ITSAppUsesNonExemptEncryption: false
+
+  SwottyWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: SwottyWidget
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.boundaryline.swotty.widget
+        PRODUCT_NAME: SwottyWidget
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SKIP_INSTALL: YES
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: SwottyWidget/Info.plist
+    info:
+      path: SwottyWidget/Info.plist
+      properties:
+        CFBundleDisplayName: Swotty
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        # The widget reads the timetable from the Calendar app.
+        NSCalendarsFullAccessUsageDescription: >-
+          Swotty shows your next class and what's due, using your Swotty
+          calendars in the Calendar app.
+        NSCalendarsUsageDescription: >-
+          Swotty shows your next class and what's due, using your Swotty
+          calendars in the Calendar app.
 
   SwottyTests:
     type: bundle.unit-test

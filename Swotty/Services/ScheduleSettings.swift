@@ -11,6 +11,10 @@ enum ScheduleSettings {
     static let weeksKey = "timetableWeeks"          // 1 = same every week, 2 = Week A / Week B
     static let weekAAnchorKey = "weekAAnchor"       // seconds since 1970 of a day in a Week A
 
+    // Posted when a setting that changes which lessons fall on which dates
+    // (weeks, week start, which week is A) is changed.
+    static let didChangeNotification = Notification.Name("ScheduleSettingsDidChange")
+
     // Weekdays in display order, using Calendar numbering
     // (1 = Sunday, 2 = Monday … 7 = Saturday).
     static func orderedDays(weekStart: Int, showWeekend: Bool) -> [Int] {
@@ -78,12 +82,14 @@ enum ScheduleSettings {
         if count == 2, defaults.double(forKey: weekAAnchorKey) == 0 {
             setCurrentWeekType(1, defaults: defaults)
         }
+        NotificationCenter.default.post(name: didChangeNotification, object: nil)
     }
 
     // "This week is Week A / Week B."
     static func setCurrentWeekType(_ type: Int, defaults: UserDefaults = .standard) {
         let start = (defaults.object(forKey: weekStartKey) as? Int) ?? 2
         defaults.set(anchor(settingWeekOf: Date(), to: type, weekStart: start), forKey: weekAAnchorKey)
+        NotificationCenter.default.post(name: didChangeNotification, object: nil)
     }
 
     // Changing the first day of the week must not flip which week is A.
@@ -94,6 +100,7 @@ enum ScheduleSettings {
             defaults.set(anchor(settingWeekOf: Date(), to: current, weekStart: newStart),
                          forKey: weekAAnchorKey)
         }
+        NotificationCenter.default.post(name: didChangeNotification, object: nil)
     }
 
     // "Monday", "Sunday" … for the week-start picker.

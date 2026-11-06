@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 
 // The app's name. Change it here and it updates the
 // Settings screen, the Calendar app and calendar events.
@@ -41,6 +42,9 @@ struct SwottyApp: App {
                     // so top them up whenever the app comes back to the front.
                     if phase == .active {
                         store.refreshClassReminders()
+                    } else if phase == .background {
+                        // The widget reads the Calendar, so refresh it when leaving the app.
+                        WidgetCenter.shared.reloadAllTimelines()
                     }
                 }
         }

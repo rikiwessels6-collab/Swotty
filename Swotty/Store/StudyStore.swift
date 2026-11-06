@@ -13,6 +13,7 @@ final class StudyStore: ObservableObject {
         didSet {
             save(lessons, key: lessonsKey)
             ClassReminders.rescheduleLessons(lessons, subjects: subjects)
+            CalendarSync.shared.scheduleTimetableSync(lessons: lessons, subjects: subjects)
         }
     }
 
@@ -47,6 +48,7 @@ final class StudyStore: ObservableObject {
         }
         upgradeSubjectsIfNeeded()
         refreshClassReminders()
+        CalendarSync.shared.updateTimetableSource(lessons: lessons, subjects: subjects)
     }
 
     // Runs once to bring older saved subjects up to date
@@ -182,6 +184,7 @@ final class StudyStore: ObservableObject {
         // Names may have changed, so refresh reminders and events.
         items.filter { $0.subjectID == subject.id }.forEach { refreshExtras(for: $0.id) }
         ClassReminders.rescheduleLessons(lessons, subjects: subjects)
+        CalendarSync.shared.scheduleTimetableSync(lessons: lessons, subjects: subjects)
     }
 
     func deleteSubject(_ subject: Subject) {

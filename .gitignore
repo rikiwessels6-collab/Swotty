@@ -9,3 +9,4 @@ xcuserdata/
 *.ipa
 *.dSYM.zip
 Swotty/Resources/Info.plist
+SwottyWidget/Info.plist
