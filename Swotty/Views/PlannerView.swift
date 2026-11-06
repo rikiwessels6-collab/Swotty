@@ -174,7 +174,9 @@ struct PlannerView: View {
                     Section {
                         EmptyStateView(icon: "books.vertical.fill",
                                        title: "No assessments yet",
-                                       message: "Tap + to add an exam, assignment or quiz.")
+                                       message: "Add an exam, assignment or quiz and Swotty will count down to it.",
+                                       actionTitle: "Quick add",
+                                       action: { showingQuickAdd = true })
                     }
                     .listRowBackground(Theme.surface)
                 }

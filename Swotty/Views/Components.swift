@@ -14,6 +14,7 @@ struct AssessmentRow: View {
                     .foregroundStyle(item.isCompleted ? Color.green : subject.color)
             }
             .buttonStyle(.borderless)
+            .accessibilityLabel(item.isCompleted ? "Mark as not done" : "Mark as done")
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.title)
@@ -45,9 +46,12 @@ struct AssessmentRow: View {
                         .lineLimit(1)
                 }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(item.accessibilitySummary(subjectName: subject.name))
 
             Spacer()
 
+            Group {
             if item.isCompleted {
                 if item.hasResult {
                     ResultBadge(item: item)
@@ -68,6 +72,8 @@ struct AssessmentRow: View {
                     .foregroundStyle(.secondary)
                 }
             }
+            }
+            .accessibilityHidden(true)
         }
         .padding(.vertical, 4)
     }
@@ -260,6 +266,8 @@ struct EmptyStateView: View {
     let icon: String
     let title: String
     let message: String
+    var actionTitle: String? = nil
+    var action: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 10) {
@@ -272,6 +280,11 @@ struct EmptyStateView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+            if let actionTitle, let action {
+                Button(actionTitle, action: action)
+                    .buttonStyle(BrandButtonStyle())
+                    .padding(.top, 4)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 30)
