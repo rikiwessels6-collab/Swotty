@@ -29,13 +29,12 @@ struct ContentView: View {
                 }
             }
         }
-        .sheet(isPresented: $showWelcome) {
-            WelcomeView {
+        .fullScreenCover(isPresented: $showWelcome) {
+            OnboardingView {
                 hasOnboarded = true
                 showWelcome = false
             }
             .environmentObject(store)
-            .interactiveDismissDisabled()
         }
     }
 }

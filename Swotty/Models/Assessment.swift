@@ -126,3 +126,27 @@ extension Array where Element == Assessment {
         return marked.reduce(0) { $0 + $1.pct * $1.weight } / totalWeight
     }
 }
+
+extension Assessment {
+    // One sentence for VoiceOver instead of reading every badge separately.
+    func accessibilitySummary(subjectName: String) -> String {
+        var parts = ["\(subjectName) \(type.rawValue.lowercased()): \(title)"]
+        if isCompleted {
+            parts.append("completed")
+        } else {
+            let days = daysRemaining
+            if days < 0 {
+                parts.append(days == -1 ? "overdue by 1 day" : "overdue by \(-days) days")
+            } else if days == 0 {
+                parts.append("due today")
+            } else if days == 1 {
+                parts.append("due tomorrow")
+            } else {
+                parts.append("due in \(days) days")
+            }
+        }
+        if !steps.isEmpty { parts.append("\(stepsDone) of \(steps.count) steps done") }
+        if let percentage { parts.append("scored \(Int(percentage.rounded())) percent") }
+        return parts.joined(separator: ", ")
+    }
+}

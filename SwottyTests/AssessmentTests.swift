@@ -54,4 +54,16 @@ final class AssessmentTests: XCTestCase {
         XCTAssertEqual(formatMinutes(120), "2 h")
         XCTAssertEqual(formatMinutes(95), "1 h 35 min")
     }
+
+    func testAccessibilitySummary() {
+        var a = make(due: Calendar.current.date(byAdding: .day, value: 1, to: Date())!)
+        a.steps = [ChecklistStep(text: "a", isDone: true), ChecklistStep(text: "b")]
+        XCTAssertEqual(a.accessibilitySummary(subjectName: "Maths"),
+                       "Maths exam: Test, due tomorrow, 1 of 2 steps done")
+        a.isCompleted = true
+        a.score = 17
+        a.outOf = 20
+        XCTAssertTrue(a.accessibilitySummary(subjectName: "Maths").contains("completed"))
+        XCTAssertTrue(a.accessibilitySummary(subjectName: "Maths").contains("scored 85 percent"))
+    }
 }

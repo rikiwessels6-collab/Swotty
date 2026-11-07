@@ -71,6 +71,7 @@ struct BackupSection: View {
         } footer: {
             Text("Save a copy of your assessments, results, subjects and timetable to Files, then restore it on this or another device.")
         }
+        .listRowBackground(Theme.surface)
     }
 
     private func handleImport(_ result: Result<URL, Error>) {

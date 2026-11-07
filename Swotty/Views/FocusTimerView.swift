@@ -37,7 +37,7 @@ struct FocusTimerView: View {
         return 1 - remaining / phaseLength
     }
 
-    private var phaseColor: Color { isBreak ? .green : .indigo }
+    private var phaseColor: Color { isBreak ? Theme.emerald : Theme.gold }
 
     private var upcomingItems: [Assessment] {
         store.items.filter { !$0.isCompleted }.sorted { $0.dueDate < $1.dueDate }
@@ -60,7 +60,7 @@ struct FocusTimerView: View {
                 .frame(maxWidth: 600)
                 .frame(maxWidth: .infinity)
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Theme.background)
             .navigationTitle("Focus")
             .onReceive(ticker) { time in
                 now = time
@@ -74,8 +74,7 @@ struct FocusTimerView: View {
     private var timerCard: some View {
         VStack(spacing: 20) {
             Text(isBreak ? "Break time" : "Focus time")
-                .font(.title2)
-                .bold()
+                .font(.display(.title2))
                 .foregroundStyle(phaseColor)
 
             ZStack {
@@ -100,9 +99,7 @@ struct FocusTimerView: View {
                         start()
                     }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(phaseColor)
-                .controlSize(.large)
+                .buttonStyle(BrandButtonStyle(color: phaseColor))
 
                 Button("Reset") { reset() }
                     .buttonStyle(.bordered)
