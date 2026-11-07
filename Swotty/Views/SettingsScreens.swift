@@ -152,6 +152,8 @@ struct ReminderSettingsView: View {
     @AppStorage("classRemindersEnabled") private var classRemindersOn = false
     @AppStorage("classReminderMinutes") private var classReminderMinutes = 10
     @AppStorage("reviewRemindersEnabled") private var reviewRemindersOn = false
+    @AppStorage(StudyReminders.revisionKey) private var revisionRemindersOn = false
+    @AppStorage(StudyReminders.summaryKey) private var weeklySummaryOn = false
 
     var body: some View {
         Form {
@@ -208,6 +210,28 @@ struct ReminderSettingsView: View {
                 Text("Classes")
             } footer: {
                 Text("Class reminders repeat every week using your timetable. The notes reminder arrives at your reminder time while you have notes waiting to be reviewed.")
+            }
+            .listRowBackground(Theme.surface)
+
+            Section {
+                Toggle("Revision reminders", isOn: Binding(
+                    get: { revisionRemindersOn },
+                    set: { newValue in
+                        revisionRemindersOn = newValue
+                        store.refreshClassReminders()
+                    }
+                ))
+                Toggle("Sunday week-ahead summary", isOn: Binding(
+                    get: { weeklySummaryOn },
+                    set: { newValue in
+                        weeklySummaryOn = newValue
+                        store.refreshClassReminders()
+                    }
+                ))
+            } header: {
+                Text("Study")
+            } footer: {
+                Text("Revision reminders arrive at your reminder time a week, three days and one day before each exam. The summary arrives on Sunday at 6:00 pm and lists what is due in the coming week.")
             }
             .listRowBackground(Theme.surface)
         }

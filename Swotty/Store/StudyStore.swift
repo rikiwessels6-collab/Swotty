@@ -165,6 +165,7 @@ final class StudyStore: ObservableObject {
         let item = items[i]
         ReminderScheduler.schedule(item, subject: subject(for: item))
         syncToCalendar(item)
+        StudyReminders.reschedule(items: items, subjects: subjects)
     }
 
     func rescheduleAllReminders() {
@@ -176,6 +177,7 @@ final class StudyStore: ObservableObject {
     func refreshClassReminders() {
         ClassReminders.rescheduleLessons(lessons, subjects: subjects)
         ClassReminders.rescheduleReview(pendingCount: pendingReviewNotes.count)
+        StudyReminders.reschedule(items: items, subjects: subjects)
     }
 
     // ---- Calendar ----

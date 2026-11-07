@@ -86,3 +86,49 @@ final class InsightsTests: XCTestCase {
         XCTAssertNil(r.date)
     }
 }
+
+final class StudyRemindersTests: XCTestCase {
+    private var cal: Calendar {
+        var c = Calendar(identifier: .gregorian)
+        c.firstWeekday = 2
+        c.timeZone = TimeZone(identifier: "UTC")!
+        return c
+    }
+
+    // Monday 10 Nov 2025, 09:00
+    private var now: Date { cal.date(from: DateComponents(year: 2025, month: 11, day: 10, hour: 9))! }
+
+    private func item(_ title: String, day: Int, type: AssessmentType) -> Assessment {
+        Assessment(title: title, type: type, subjectID: Subject.maths.id,
+                   dueDate: cal.date(from: DateComponents(year: 2025, month: 11, day: day, hour: 12))!)
+    }
+
+    func testRevisionPlanForExamNextWeek() {
+        let plan = StudyReminders.revisionPlan(items: [item("e", day: 17, type: .exam)],
+                                               subjectName: { _ in "Maths" }, hour: 16,
+                                               now: now, calendar: cal)
+        XCTAssertEqual(plan.count, 3)
+        XCTAssertEqual(Set(plan.map { $0.id }).count, 3)
+        XCTAssertTrue(plan.allSatisfy { $0.fireDate > now })
+        XCTAssertTrue(plan.last!.body.contains("tomorrow"))
+    }
+
+    func testRevisionPlanIgnoresFarExamsAndNonExams() {
+        let items = [item("far", day: 30, type: .exam), item("task", day: 12, type: .assignment)]
+        XCTAssertTrue(StudyReminders.revisionPlan(items: items, subjectName: { _ in "Maths" },
+                                                  hour: 16, now: now, calendar: cal).isEmpty)
+    }
+
+    func testWeeklySummaryCountsNextMondayToSunday() {
+        // Sunday 16 Nov at 18:00, covering Mon 17 to Sun 23 Nov.
+        let items = [item("a", day: 17, type: .assignment), item("b", day: 21, type: .quiz),
+                     item("c", day: 24, type: .exam), item("d", day: 14, type: .exam)]
+        let summary = StudyReminders.weeklySummary(items: items, now: now, calendar: cal)
+        XCTAssertEqual(summary?.fireDate, cal.date(from: DateComponents(year: 2025, month: 11, day: 16, hour: 18)))
+        XCTAssertTrue(summary?.body.contains("2 things") ?? false)
+    }
+
+    func testWeeklySummaryIsNilWhenNothingDue() {
+        XCTAssertNil(StudyReminders.weeklySummary(items: [], now: now, calendar: cal))
+    }
+}
