@@ -55,6 +55,7 @@ struct Subject: Identifiable, Codable, Hashable {
     var name: String
     var colour: SubjectColour
     var icon: String
+    var targetPercentage: Double? = nil   // optional goal for this subject's average
 
     var color: Color { colour.color }
 

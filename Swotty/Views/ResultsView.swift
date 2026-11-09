@@ -173,6 +173,12 @@ struct ResultsView: View {
                 Text(row.count == 1 ? "1 result" : "\(row.count) results")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if let target = row.subject.targetPercentage {
+                    Text(GradeTarget.advice(items: scoped.filter { $0.subjectID == row.subject.id },
+                                            target: target))
+                        .font(.caption)
+                        .foregroundStyle(Theme.gold)
+                }
             }
             Spacer()
             Text("\(formatNumber(row.average))%")

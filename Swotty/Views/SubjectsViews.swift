@@ -110,6 +110,23 @@ struct SubjectEditor: View {
                 }
                 .listRowBackground(Theme.surface)
 
+                Section {
+                    Toggle("Set a target grade", isOn: Binding(
+                        get: { draft.targetPercentage != nil },
+                        set: { draft.targetPercentage = $0 ? 80 : nil }
+                    ))
+                    if let target = draft.targetPercentage {
+                        Stepper("Target: \(Int(target))%",
+                                value: Binding(get: { target }, set: { draft.targetPercentage = $0 }),
+                                in: 40...100, step: 5)
+                    }
+                } header: {
+                    Text("Goal")
+                } footer: {
+                    Text("Results shows what you need to score next to reach it.")
+                }
+                .listRowBackground(Theme.surface)
+
                 Section("Colour") {
                     LazyVGrid(columns: grid, spacing: 12) {
                         ForEach(SubjectColour.allCases) { colour in

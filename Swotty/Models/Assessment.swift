@@ -182,3 +182,34 @@ extension Assessment {
             || subjectName.localizedCaseInsensitiveContains(query)
     }
 }
+
+// MARK: - Grade targets
+enum GradeTarget {
+    // The percentage the next result (with the given weight) must reach
+    // for the weighted average to hit the target.
+    static func scoreNeeded(items: [Assessment], target: Double, nextWeight: Double = 1) -> Double {
+        var totalWeight = 0.0
+        var weightedSum = 0.0
+        for item in items {
+            if let pct = item.percentage {
+                totalWeight += item.weight
+                weightedSum += pct * item.weight
+            }
+        }
+        let weight = nextWeight > 0 ? nextWeight : 1
+        return (target * (totalWeight + weight) - weightedSum) / weight
+    }
+
+    static func advice(items: [Assessment], target: Double) -> String {
+        let goal = Int(target.rounded())
+        let needed = scoreNeeded(items: items, target: target)
+        if needed > 100 {
+            return "\(goal)% target: out of reach with one more result"
+        }
+        let aim = max(0, Int(needed.rounded(.up)))
+        if let average = items.weightedAveragePercentage, average >= target {
+            return "On track for \(goal)%. Keep scoring \(aim)% or more"
+        }
+        return "Aim for \(aim)% next to reach \(goal)%"
+    }
+}
