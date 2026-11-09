@@ -2,24 +2,37 @@ import SwiftUI
 
 // MARK: - Colours and icons for subjects
 enum SubjectColour: String, CaseIterable, Identifiable, Codable {
+    case gold, emerald
     case red, orange, yellow, green, mint, teal, blue, indigo, purple, pink, brown, grey
 
     var id: String { rawValue }
 
+    // A refined palette: deeper, slightly muted tones that sit well on navy and ivory.
     var color: Color {
         switch self {
-        case .red: return .red
-        case .orange: return .orange
-        case .yellow: return .yellow
-        case .green: return .green
-        case .mint: return .mint
-        case .teal: return .teal
-        case .blue: return .blue
-        case .indigo: return .indigo
-        case .purple: return .purple
-        case .pink: return .pink
-        case .brown: return .brown
-        case .grey: return .gray
+        case .gold: return Theme.gold
+        case .emerald: return Theme.emerald
+        default: return Color(hex: hex)
+        }
+    }
+
+    // The colour as a plain number, so the widget can draw the same colours.
+    var hex: UInt32 {
+        switch self {
+        case .gold: return 0xE3B25A
+        case .emerald: return 0x2DC48D
+        case .red: return 0xD1495B
+        case .orange: return 0xE08E45
+        case .yellow: return 0xE3B23C
+        case .green: return 0x2FA77B
+        case .mint: return 0x6CC4A1
+        case .teal: return 0x2A9DA8
+        case .blue: return 0x4C7DDB
+        case .indigo: return 0x6B63D6
+        case .purple: return 0x9A5FC0
+        case .pink: return 0xD86BA0
+        case .brown: return 0x9B7653
+        case .grey: return 0x8591A5
         }
     }
 }
@@ -42,6 +55,7 @@ struct Subject: Identifiable, Codable, Hashable {
     var name: String
     var colour: SubjectColour
     var icon: String
+    var targetPercentage: Double? = nil   // optional goal for this subject's average
 
     var color: Color { colour.color }
 

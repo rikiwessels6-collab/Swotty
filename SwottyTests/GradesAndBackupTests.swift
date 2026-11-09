@@ -57,3 +57,39 @@ final class GradesAndBackupTests: XCTestCase {
         }
     }
 }
+
+final class GradeTargetTests: XCTestCase {
+    private func result(_ score: Double, weight: Double = 1) -> Assessment {
+        var a = Assessment(title: "r", type: .exam, subjectID: Subject.maths.id, dueDate: Date())
+        a.score = score
+        a.outOf = 100
+        a.weight = weight
+        return a
+    }
+
+    func testNeededScoreWithNoResultsIsTheTarget() {
+        XCTAssertEqual(GradeTarget.scoreNeeded(items: [], target: 80), 80, accuracy: 0.001)
+    }
+
+    func testNeededScoreToLiftAverage() {
+        // One 70, target 80, equal weight: next must be 90.
+        XCTAssertEqual(GradeTarget.scoreNeeded(items: [result(70)], target: 80), 90, accuracy: 0.001)
+    }
+
+    func testNeededScoreRespectsWeights() {
+        // 60 at weight 3, target 70, next weight 1: (70*4 - 180)/1 = 100.
+        XCTAssertEqual(GradeTarget.scoreNeeded(items: [result(60, weight: 3)], target: 70), 100, accuracy: 0.001)
+    }
+
+    func testAdviceWording() {
+        XCTAssertEqual(GradeTarget.advice(items: [result(70)], target: 80), "Aim for 90% next to reach 80%")
+        XCTAssertTrue(GradeTarget.advice(items: [result(50)], target: 90).contains("out of reach"))
+        XCTAssertTrue(GradeTarget.advice(items: [result(95)], target: 80).hasPrefix("On track for 80%"))
+    }
+
+    func testOldSubjectsWithoutTargetStillDecode() throws {
+        let json = #"{"id":"maths","name":"Maths","colour":"red","icon":"function"}"#.data(using: .utf8)!
+        let subject = try JSONDecoder().decode(Subject.self, from: json)
+        XCTAssertNil(subject.targetPercentage)
+    }
+}

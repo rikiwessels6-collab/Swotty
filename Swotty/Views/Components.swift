@@ -9,11 +9,17 @@ struct AssessmentRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Button(action: onToggle) {
-                Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .font(.title2)
-                    .foregroundStyle(item.isCompleted ? Color.green : subject.color)
+                ZStack {
+                    Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
+                        .font(.title2)
+                        .foregroundStyle(item.isCompleted ? Color.green : subject.color)
+                        .id(item.isCompleted)
+                        .transition(.scale(scale: 0.4).combined(with: .opacity))
+                }
+                .animation(.spring(response: 0.35, dampingFraction: 0.55), value: item.isCompleted)
             }
             .buttonStyle(.borderless)
+            .accessibilityLabel(item.isCompleted ? "Mark as not done" : "Mark as done")
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.title)
@@ -45,9 +51,12 @@ struct AssessmentRow: View {
                         .lineLimit(1)
                 }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(item.accessibilitySummary(subjectName: subject.name))
 
             Spacer()
 
+            Group {
             if item.isCompleted {
                 if item.hasResult {
                     ResultBadge(item: item)
@@ -68,8 +77,18 @@ struct AssessmentRow: View {
                     .foregroundStyle(.secondary)
                 }
             }
+            }
+            .accessibilityHidden(true)
         }
+        .padding(.leading, 10)
         .padding(.vertical, 4)
+        // Subject colour stripe: every entry reads at a glance.
+        .overlay(alignment: .leading) {
+            Capsule()
+                .fill(subject.color.opacity(item.isCompleted ? 0.35 : 1))
+                .frame(width: 4)
+                .padding(.vertical, 2)
+        }
     }
 }
 
@@ -86,7 +105,7 @@ struct CountdownBadge: View {
     private var color: Color {
         if days <= 0 { return .red }
         if days <= 3 { return .orange }
-        return .blue
+        return Theme.emerald
     }
 
     var body: some View {
@@ -146,17 +165,20 @@ struct StatTile: View {
                     .foregroundStyle(color)
             }
             Text(value)
-                .font(.title)
-                .bold()
+                .font(.display(.title, weight: .bold))
                 .foregroundStyle(color)
+                .contentTransition(.numericText())
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: value)
             Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .padding(.vertical, 14)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .strokeBorder(Theme.hairline, lineWidth: 0.75))
+        .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
     }
 }
 
@@ -197,8 +219,7 @@ struct NextUpCard: View {
                     .bold()
                     .opacity(0.85)
                 Text(item.title)
-                    .font(.title2)
-                    .bold()
+                    .font(.display(.title2, weight: .bold))
                     .lineLimit(2)
                 Label("\(subject.name) · \(item.type.rawValue)", systemImage: subject.icon)
                     .font(.subheadline)
@@ -228,9 +249,13 @@ struct NextUpCard: View {
             LinearGradient(colors: [subject.color, subject.color.opacity(0.65)],
                            startPoint: .topLeading, endPoint: .bottomTrailing)
                 .overlay(Color.black.opacity(0.12))
+                .overlay(
+                    LinearGradient(colors: [Color.white.opacity(0.22), Color.clear],
+                                   startPoint: .top, endPoint: .center)
+                )
         )
-        .clipShape(RoundedRectangle(cornerRadius: 22))
-        .shadow(color: subject.color.opacity(0.35), radius: 10, y: 5)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: subject.color.opacity(0.40), radius: 14, y: 8)
     }
 }
 
@@ -248,9 +273,11 @@ struct FilterChip: View {
                 .bold()
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
-                .background(isSelected ? color : Color(.secondarySystemGroupedBackground))
-                .foregroundStyle(isSelected ? Color.white : Color.primary)
+                .background(isSelected ? color : Theme.surface)
+                .foregroundStyle(isSelected ? (color.prefersDarkText ? Theme.onAccent : Color.white) : Color.primary)
                 .clipShape(Capsule())
+                .overlay(Capsule().strokeBorder(isSelected ? Color.clear : Theme.hairline, lineWidth: 0.75))
+                .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isSelected)
         }
         .buttonStyle(.plain)
     }
@@ -260,6 +287,8 @@ struct EmptyStateView: View {
     let icon: String
     let title: String
     let message: String
+    var actionTitle: String? = nil
+    var action: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 10) {
@@ -272,6 +301,11 @@ struct EmptyStateView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+            if let actionTitle, let action {
+                Button(actionTitle, action: action)
+                    .buttonStyle(BrandButtonStyle())
+                    .padding(.top, 4)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 30)

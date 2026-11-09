@@ -48,3 +48,11 @@ secret's value box. Don't paste the key into any website or chat.
 Open the failed run in Actions and read the step that went red. Common causes:
 a missing secret, a bundle ID that doesn't match the registered one, or the
 API key not having Admin access.
+
+## Optional: App Group for the widget
+
+Not needed for uploads. Without it the widgets read your Swotty calendar in Apple
+Calendar. Making them read the app's own timetable needs an App Group registered by
+hand at developer.apple.com (Identifiers, App Groups, `group.com.boundaryline.swotty`,
+then enabled on both App IDs) and the entitlement embedded in the archive. Without the
+registration the upload fails with "No profiles for 'com.boundaryline.swotty' were found".

@@ -3,17 +3,30 @@ import SwiftUI
 // MARK: - The store (all data, saved automatically)
 final class StudyStore: ObservableObject {
     @Published var items: [Assessment] = [] {
-        didSet { save(items, key: itemsKey) }
+        didSet {
+            save(items, key: itemsKey)
+            refreshWidget()
+        }
     }
     @Published var subjects: [Subject] = Subject.defaults {
-        didSet { save(subjects, key: subjectsKey) }
+        didSet {
+            save(subjects, key: subjectsKey)
+            refreshWidget()
+        }
     }
 
     @Published var lessons: [Lesson] = [] {
         didSet {
             save(lessons, key: lessonsKey)
             ClassReminders.rescheduleLessons(lessons, subjects: subjects)
+            CalendarSync.shared.scheduleTimetableSync(lessons: lessons, subjects: subjects)
+            refreshWidget()
         }
+    }
+
+    // The school day's bell schedule (Period 1, 2, 3 …). Empty = not using periods.
+    @Published var periods: [ClassPeriod] = [] {
+        didSet { save(periods, key: periodsKey) }
     }
 
     @Published var notes: [ClassNote] = [] {
@@ -27,6 +40,8 @@ final class StudyStore: ObservableObject {
     private let subjectsKey = "studyPlanner.subjects"
     private let lessonsKey = "studyPlanner.lessons"
     private let notesKey = "studyPlanner.notes"
+    private let periodsKey = "studyPlanner.periods"
+    private var settingsObserver: NSObjectProtocol?
 
     init() {
         if let saved: [Assessment] = load(key: itemsKey) {
@@ -38,6 +53,9 @@ final class StudyStore: ObservableObject {
         if let saved: [ClassNote] = load(key: notesKey) {
             notes = saved
         }
+        if let saved: [ClassPeriod] = load(key: periodsKey) {
+            periods = saved
+        }
         if let saved: [Subject] = load(key: subjectsKey), !saved.isEmpty {
             subjects = saved
         }
@@ -47,6 +65,14 @@ final class StudyStore: ObservableObject {
         }
         upgradeSubjectsIfNeeded()
         refreshClassReminders()
+        CalendarSync.shared.updateTimetableSource(lessons: lessons, subjects: subjects)
+
+        // Which week is A (and the week start) change what the widget shows.
+        settingsObserver = NotificationCenter.default.addObserver(
+            forName: ScheduleSettings.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.refreshWidget()
+        }
+        refreshWidget()
     }
 
     // Runs once to bring older saved subjects up to date
@@ -94,15 +120,26 @@ final class StudyStore: ObservableObject {
         refreshExtras(for: item.id)
     }
 
-    func delete(_ item: Assessment) {
+    // The last thing deleted, kept briefly so it can be brought back.
+    @Published var recentlyDeleted: Assessment? = nil
+
+    func delete(_ item: Assessment, undoable: Bool = true) {
         ReminderScheduler.cancel(item)
         CalendarSync.shared.remove(item)
         items.removeAll { $0.id == item.id }
+        recentlyDeleted = undoable ? item : nil
+    }
+
+    func undoDelete() {
+        guard let item = recentlyDeleted else { return }
+        recentlyDeleted = nil
+        add(item)
     }
 
     func toggleCompleted(_ item: Assessment) {
         guard let i = index(of: item.id) else { return }
         items[i].isCompleted.toggle()
+        if items[i].isCompleted { Haptics.success() }
         refreshExtras(for: item.id)
     }
 
@@ -119,7 +156,7 @@ final class StudyStore: ObservableObject {
     }
 
     func clearCompleted() {
-        items.filter { $0.isCompleted }.forEach { delete($0) }
+        items.filter { $0.isCompleted }.forEach { delete($0, undoable: false) }
     }
 
     // Updates the reminder and the calendar event for one item.
@@ -128,6 +165,7 @@ final class StudyStore: ObservableObject {
         let item = items[i]
         ReminderScheduler.schedule(item, subject: subject(for: item))
         syncToCalendar(item)
+        StudyReminders.reschedule(items: items, subjects: subjects)
     }
 
     func rescheduleAllReminders() {
@@ -139,6 +177,7 @@ final class StudyStore: ObservableObject {
     func refreshClassReminders() {
         ClassReminders.rescheduleLessons(lessons, subjects: subjects)
         ClassReminders.rescheduleReview(pendingCount: pendingReviewNotes.count)
+        StudyReminders.reschedule(items: items, subjects: subjects)
     }
 
     // ---- Calendar ----
@@ -182,6 +221,7 @@ final class StudyStore: ObservableObject {
         // Names may have changed, so refresh reminders and events.
         items.filter { $0.subjectID == subject.id }.forEach { refreshExtras(for: $0.id) }
         ClassReminders.rescheduleLessons(lessons, subjects: subjects)
+        CalendarSync.shared.scheduleTimetableSync(lessons: lessons, subjects: subjects)
     }
 
     func deleteSubject(_ subject: Subject) {
@@ -221,7 +261,8 @@ final class StudyStore: ObservableObject {
                    subjects: subjects,
                    items: items,
                    lessons: lessons,
-                   notes: notes)
+                   notes: notes,
+                   periods: periods)
     }
 
     // Replaces everything with the backup's contents.
@@ -235,6 +276,7 @@ final class StudyStore: ObservableObject {
             restoredSubjects.append(Subject.fallback)
         }
         subjects = restoredSubjects
+        periods = backup.periods
         lessons = backup.lessons
         notes = backup.notes
         items = backup.items.map { item in
@@ -256,6 +298,32 @@ final class StudyStore: ObservableObject {
         lessons
             .filter { $0.weekday == weekday }
             .sorted { $0.startMinutes < $1.startMinutes }
+    }
+
+    // Lessons on a weekday that run in the given week (nil = every week).
+    func lessons(on weekday: Int, week: Int?) -> [Lesson] {
+        lessons(on: weekday).filter { $0.runs(inWeek: week) }
+    }
+
+    // The lessons happening on a particular date, following Week A / Week B.
+    func lessons(onDate date: Date) -> [Lesson] {
+        let weekday = Calendar.current.component(.weekday, from: date)
+        return lessons(on: weekday, week: ScheduleSettings.weekType(on: date))
+    }
+
+    // Copies every lesson that runs only in one week into the other week,
+    // replacing whatever was only in the other week. "Every week" lessons are untouched.
+    func copyWeek(from source: Int, to target: Int) {
+        guard source != target, (1...2).contains(source), (1...2).contains(target) else { return }
+        let copies = lessons.filter { $0.week == source }.map { lesson -> Lesson in
+            var copy = lesson
+            copy.id = UUID()
+            copy.week = target
+            copy.isDemo = false
+            return copy
+        }
+        lessons.removeAll { $0.week == target }
+        lessons.append(contentsOf: copies)
     }
 
     func addLesson(_ lesson: Lesson) {
@@ -304,6 +372,80 @@ final class StudyStore: ObservableObject {
     func toggleReviewed(_ note: ClassNote) {
         guard let i = notes.firstIndex(where: { $0.id == note.id }) else { return }
         notes[i].isReviewed.toggle()
+    }
+
+    // ---- Class periods ----
+    func period(number: Int) -> ClassPeriod? {
+        periods.first { $0.number == number }
+    }
+
+    // Saves the bell schedule and keeps lessons in step: a lesson in a period
+    // takes that period's times, and loses its period if the period was removed.
+    func setPeriods(_ newPeriods: [ClassPeriod]) {
+        let sorted = newPeriods.sorted { $0.number < $1.number }
+        periods = sorted
+        var changed = lessons
+        var didChange = false
+        for index in changed.indices where changed[index].period > 0 {
+            if let period = sorted.first(where: { $0.number == changed[index].period }) {
+                if changed[index].startMinutes != period.startMinutes || changed[index].endMinutes != period.endMinutes {
+                    changed[index].startMinutes = period.startMinutes
+                    changed[index].endMinutes = period.endMinutes
+                    didChange = true
+                }
+            } else {
+                changed[index].period = 0
+                didChange = true
+            }
+        }
+        if didChange { lessons = changed }
+    }
+
+    // ---- Widget ----
+    func makeWidgetSnapshot() -> WidgetSnapshot {
+        let defaults = UserDefaults.standard
+        let snapshotLessons = lessons.map { lesson -> SnapshotLesson in
+            let info = self.subject(for: lesson.subjectID)
+            return SnapshotLesson(id: lesson.id.uuidString,
+                                  subjectName: info.name,
+                                  colorHex: info.colour.hex,
+                                  weekday: lesson.weekday,
+                                  startMinutes: lesson.startMinutes,
+                                  endMinutes: lesson.endMinutes,
+                                  room: lesson.room,
+                                  teacher: lesson.teacher,
+                                  week: lesson.week,
+                                  period: lesson.period)
+        }
+        let earliest = Calendar.current.date(byAdding: .day, value: -7, to: Calendar.current.startOfDay(for: Date())) ?? Date()
+        let snapshotTasks = items
+            .filter { !$0.isCompleted && $0.dueDate >= earliest }
+            .sorted { $0.dueDate < $1.dueDate }
+            .prefix(40)
+            .map { item -> SnapshotTask in
+                let info = self.subject(for: item.subjectID)
+                return SnapshotTask(id: item.id.uuidString, title: item.title,
+                                    subjectName: info.name, colorHex: info.colour.hex,
+                                    typeName: item.type.rawValue, dueDate: item.dueDate)
+            }
+        return WidgetSnapshot(generatedAt: Date(),
+                              lessons: snapshotLessons,
+                              tasks: Array(snapshotTasks),
+                              twoWeek: defaults.integer(forKey: ScheduleSettings.weeksKey) == 2,
+                              weekAAnchor: defaults.double(forKey: ScheduleSettings.weekAAnchorKey),
+                              weekStart: (defaults.object(forKey: ScheduleSettings.weekStartKey) as? Int) ?? 2,
+                              showWeekend: defaults.bool(forKey: ScheduleSettings.showWeekendKey))
+    }
+
+    // Sends the latest timetable and tasks to the widget (a moment from now,
+    // so a burst of edits becomes one update).
+    func refreshWidget(immediately: Bool = false) {
+        let snapshot = makeWidgetSnapshot()
+        if immediately {
+            WidgetSync.flush(snapshot)
+        } else {
+            WidgetSync.schedule(snapshot)
+        }
     }
 
     // ---- Demo data ----

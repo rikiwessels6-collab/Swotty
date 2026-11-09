@@ -8,6 +8,8 @@ struct PlannerView: View {
 
     @State private var subjectFilter: String? = nil   // nil means "All"
     @State private var showingAddSheet = false
+    @State private var showingQuickAdd = false
+    @State private var searchText = ""
     @State private var editingItem: Assessment? = nil
     @State private var showCompleted = false
 
@@ -18,11 +20,17 @@ struct PlannerView: View {
     // Starts as "authorized" so the card never flashes before we know.
     @State private var notificationStatus: UNAuthorizationStatus = .authorized
     @State private var showingReview = false
+    @AppStorage(ScheduleSettings.weeksKey) private var timetableWeeks = 1
+    @AppStorage(ScheduleSettings.weekAAnchorKey) private var weekAAnchor: Double = 0
+    @AppStorage(ScheduleSettings.weekStartKey) private var weekStartSetting = 2
 
     // Show today's class and review shortcut only when there's something to show.
     private var showTodayCard: Bool {
+        let week: Int? = timetableWeeks == 2
+            ? ScheduleSettings.weekType(for: Date(), anchor: weekAAnchor, weekStart: weekStartSetting)
+            : nil
         let weekday = Calendar.current.component(.weekday, from: Date())
-        return !store.lessons(on: weekday).isEmpty || !store.pendingReviewNotes.isEmpty
+        return !store.lessons(on: weekday, week: week).isEmpty || !store.pendingReviewNotes.isEmpty
     }
 
     private var showNotificationNudge: Bool {
@@ -51,7 +59,10 @@ struct PlannerView: View {
     }
 
     private var visible: [Assessment] {
-        store.items.filter { subjectFilter == nil || $0.subjectID == subjectFilter }
+        store.items.filter {
+            (subjectFilter == nil || $0.subjectID == subjectFilter)
+                && $0.matches(search: searchText, subjectName: store.subject(for: $0).name)
+        }
     }
 
     private var overdue: [Assessment] {
@@ -121,15 +132,22 @@ struct PlannerView: View {
 
                 Section {
                     VStack(alignment: .leading, spacing: 14) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(greeting)
-                                .font(.title2)
-                                .bold()
-                            Text(summary)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                        HStack(spacing: 16) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(greeting)
+                                    .font(.display(.title2, weight: .bold))
+                                Text(summary)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 0)
+                            if !store.items.isEmpty {
+                                ProgressRing(progress: Double(store.items.filter { $0.isCompleted }.count)
+                                                / Double(store.items.count))
+                                    .frame(width: 62, height: 62)
+                            }
                         }
-                        .padding(.horizontal, 4)
+                        .premiumCard()
 
                         if let nextUp {
                             NextUpCard(item: nextUp, subject: store.subject(for: nextUp))
@@ -150,6 +168,14 @@ struct PlannerView: View {
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets())
 
+                if InsightsCard.hasContent(store.items) {
+                    Section {
+                        InsightsCard()
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                }
+
                 Section {
                     subjectFilterBar
                 }
@@ -160,8 +186,11 @@ struct PlannerView: View {
                     Section {
                         EmptyStateView(icon: "books.vertical.fill",
                                        title: "No assessments yet",
-                                       message: "Tap + to add an exam, assignment or quiz.")
+                                       message: "Add an exam, assignment or quiz and Swotty will count down to it.",
+                                       actionTitle: "Quick add",
+                                       action: { showingQuickAdd = true })
                     }
+                    .listRowBackground(Theme.surface)
                 }
 
                 taskSection("Overdue", items: overdue)
@@ -185,9 +214,58 @@ struct PlannerView: View {
                             .font(.caption)
                         }
                     }
+                    .listRowBackground(Theme.surface)
                 }
             }
             .listStyle(.insetGrouped)
+            .themedList()
+            .searchable(text: $searchText, prompt: "Search assessments")
+            .overlay(alignment: .bottomTrailing) {
+                Button {
+                    Haptics.tap()
+                    showingQuickAdd = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(Theme.onAccent)
+                        .frame(width: 58, height: 58)
+                        .background(Theme.goldGradient)
+                        .clipShape(Circle())
+                        .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 0.75))
+                        .shadow(color: Theme.gold.opacity(0.45), radius: 12, y: 6)
+                }
+                .padding(20)
+                .accessibilityLabel("Quick add")
+                .accessibilityHint("Adds a task or assessment from a short sentence")
+            }
+            .overlay(alignment: .bottom) {
+                if let deleted = store.recentlyDeleted {
+                    HStack {
+                        Text("Deleted \u{201C}\(deleted.title)\u{201D}")
+                            .lineLimit(1)
+                        Spacer()
+                        Button("Undo") { withAnimation { store.undoDelete() } }
+                            .bold()
+                            .foregroundStyle(Theme.gold)
+                    }
+                    .padding()
+                    .background(Theme.surfaceRaised)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .padding(.horizontal)
+                    .padding(.bottom, 88)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .task(id: deleted.id) {
+                        try? await Task.sleep(nanoseconds: 6_000_000_000)
+                        if store.recentlyDeleted?.id == deleted.id {
+                            withAnimation { store.recentlyDeleted = nil }
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $showingQuickAdd) {
+                QuickAddSheet(defaultSubjectID: subjectFilter ?? store.subjects.first?.id ?? Subject.otherID)
+                    .environmentObject(store)
+            }
             .task { await refreshNotificationStatus() }
             .sheet(isPresented: $showingReview) {
                 ReviewNotesView()
@@ -225,6 +303,7 @@ struct PlannerView: View {
                     row(for: item)
                 }
             }
+            .listRowBackground(Theme.surface)
         }
     }
 
@@ -235,6 +314,14 @@ struct PlannerView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { editingItem = item }
+        .contextMenu {
+            Button {
+                store.add(item.duplicated())
+                Haptics.tap()
+            } label: {
+                Label("Duplicate", systemImage: "plus.square.on.square")
+            }
+        }
         .swipeActions(edge: .leading) {
             Button {
                 withAnimation { store.toggleCompleted(item) }

@@ -126,3 +126,90 @@ extension Array where Element == Assessment {
         return marked.reduce(0) { $0 + $1.pct * $1.weight } / totalWeight
     }
 }
+
+extension Assessment {
+    // One sentence for VoiceOver instead of reading every badge separately.
+    func accessibilitySummary(subjectName: String) -> String {
+        var parts = ["\(subjectName) \(type.rawValue.lowercased()): \(title)"]
+        if isCompleted {
+            parts.append("completed")
+        } else {
+            let days = daysRemaining
+            if days < 0 {
+                parts.append(days == -1 ? "overdue by 1 day" : "overdue by \(-days) days")
+            } else if days == 0 {
+                parts.append("due today")
+            } else if days == 1 {
+                parts.append("due tomorrow")
+            } else {
+                parts.append("due in \(days) days")
+            }
+        }
+        if !steps.isEmpty { parts.append("\(stepsDone) of \(steps.count) steps done") }
+        if let percentage { parts.append("scored \(Int(percentage.rounded())) percent") }
+        return parts.joined(separator: ", ")
+    }
+}
+
+extension Assessment {
+    // A fresh, unfinished copy (for repeating a similar task).
+    func duplicated() -> Assessment {
+        var copy = self
+        copy.id = UUID()
+        copy.title = title + " (copy)"
+        copy.isCompleted = false
+        copy.score = nil
+        copy.outOf = nil
+        copy.grade = nil
+        copy.studyMinutes = 0
+        copy.calendarEventID = nil
+        copy.isDemo = false
+        copy.steps = steps.map { step in
+            var fresh = step
+            fresh.id = UUID()
+            fresh.isDone = false
+            return fresh
+        }
+        return copy
+    }
+
+    // True if the text appears in the title, notes or subject name.
+    func matches(search text: String, subjectName: String) -> Bool {
+        let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if query.isEmpty { return true }
+        return title.localizedCaseInsensitiveContains(query)
+            || notes.localizedCaseInsensitiveContains(query)
+            || subjectName.localizedCaseInsensitiveContains(query)
+    }
+}
+
+// MARK: - Grade targets
+enum GradeTarget {
+    // The percentage the next result (with the given weight) must reach
+    // for the weighted average to hit the target.
+    static func scoreNeeded(items: [Assessment], target: Double, nextWeight: Double = 1) -> Double {
+        var totalWeight = 0.0
+        var weightedSum = 0.0
+        for item in items {
+            if let pct = item.percentage {
+                totalWeight += item.weight
+                weightedSum += pct * item.weight
+            }
+        }
+        let weight = nextWeight > 0 ? nextWeight : 1
+        return (target * (totalWeight + weight) - weightedSum) / weight
+    }
+
+    static func advice(items: [Assessment], target: Double) -> String {
+        let goal = Int(target.rounded())
+        let needed = scoreNeeded(items: items, target: target)
+        if needed > 100 {
+            return "\(goal)% target: out of reach with one more result"
+        }
+        let aim = max(0, Int(needed.rounded(.up)))
+        if let average = items.weightedAveragePercentage, average >= target {
+            return "On track for \(goal)%. Keep scoring \(aim)% or more"
+        }
+        return "Aim for \(aim)% next to reach \(goal)%"
+    }
+}

@@ -18,7 +18,10 @@ extension View {
         self
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .background(Theme.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Theme.hairline, lineWidth: 1))
+            .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
     }
 }
