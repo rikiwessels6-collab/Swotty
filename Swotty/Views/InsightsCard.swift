@@ -45,10 +45,6 @@ struct InsightsCard: View {
                     .accessibilityElement(children: .combine)
             }
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .padding(.vertical, 4)
+        .premiumCard()
     }
 }

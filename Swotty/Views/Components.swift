@@ -92,7 +92,7 @@ struct CountdownBadge: View {
     private var color: Color {
         if days <= 0 { return .red }
         if days <= 3 { return .orange }
-        return .blue
+        return Theme.emerald
     }
 
     var body: some View {
@@ -152,17 +152,20 @@ struct StatTile: View {
                     .foregroundStyle(color)
             }
             Text(value)
-                .font(.title)
-                .bold()
+                .font(.display(.title, weight: .bold))
                 .foregroundStyle(color)
+                .contentTransition(.numericText())
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: value)
             Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(Theme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .padding(.vertical, 14)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .strokeBorder(Theme.hairline, lineWidth: 0.75))
+        .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
     }
 }
 
@@ -203,8 +206,7 @@ struct NextUpCard: View {
                     .bold()
                     .opacity(0.85)
                 Text(item.title)
-                    .font(.title2)
-                    .bold()
+                    .font(.display(.title2, weight: .bold))
                     .lineLimit(2)
                 Label("\(subject.name) · \(item.type.rawValue)", systemImage: subject.icon)
                     .font(.subheadline)
@@ -234,9 +236,13 @@ struct NextUpCard: View {
             LinearGradient(colors: [subject.color, subject.color.opacity(0.65)],
                            startPoint: .topLeading, endPoint: .bottomTrailing)
                 .overlay(Color.black.opacity(0.12))
+                .overlay(
+                    LinearGradient(colors: [Color.white.opacity(0.22), Color.clear],
+                                   startPoint: .top, endPoint: .center)
+                )
         )
-        .clipShape(RoundedRectangle(cornerRadius: 22))
-        .shadow(color: subject.color.opacity(0.35), radius: 10, y: 5)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: subject.color.opacity(0.40), radius: 14, y: 8)
     }
 }
 
@@ -257,6 +263,8 @@ struct FilterChip: View {
                 .background(isSelected ? color : Theme.surface)
                 .foregroundStyle(isSelected ? (color.prefersDarkText ? Theme.onAccent : Color.white) : Color.primary)
                 .clipShape(Capsule())
+                .overlay(Capsule().strokeBorder(isSelected ? Color.clear : Theme.hairline, lineWidth: 0.75))
+                .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isSelected)
         }
         .buttonStyle(.plain)
     }

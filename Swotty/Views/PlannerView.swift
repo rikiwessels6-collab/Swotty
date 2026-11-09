@@ -132,14 +132,22 @@ struct PlannerView: View {
 
                 Section {
                     VStack(alignment: .leading, spacing: 14) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(greeting)
-                                .font(.display(.title2))
-                            Text(summary)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                        HStack(spacing: 16) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(greeting)
+                                    .font(.display(.title2, weight: .bold))
+                                Text(summary)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 0)
+                            if !store.items.isEmpty {
+                                ProgressRing(progress: Double(store.items.filter { $0.isCompleted }.count)
+                                                / Double(store.items.count))
+                                    .frame(width: 62, height: 62)
+                            }
                         }
-                        .padding(.horizontal, 4)
+                        .premiumCard()
 
                         if let nextUp {
                             NextUpCard(item: nextUp, subject: store.subject(for: nextUp))
@@ -221,9 +229,10 @@ struct PlannerView: View {
                         .font(.title2.weight(.bold))
                         .foregroundStyle(Theme.onAccent)
                         .frame(width: 58, height: 58)
-                        .background(Theme.gold)
+                        .background(Theme.goldGradient)
                         .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+                        .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 0.75))
+                        .shadow(color: Theme.gold.opacity(0.45), radius: 12, y: 6)
                 }
                 .padding(20)
                 .accessibilityLabel("Quick add")

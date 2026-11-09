@@ -47,6 +47,11 @@ enum Theme {
     static let emerald = Color.adaptive(light: 0x0E8A63, dark: 0x2DC48D)
     static let navy = Color(hex: 0x0A1524)
 
+    // A soft gold sheen for the main call-to-action and progress rings.
+    static let goldGradient = LinearGradient(
+        colors: [Color.adaptive(light: 0xC79A3B, dark: 0xF2CB7E), Color.adaptive(light: 0xA97B1F, dark: 0xE3B25A)],
+        startPoint: .topLeading, endPoint: .bottomTrailing)
+
     // Text that sits on top of a gold or emerald fill.
     static let onAccent = Color(hex: 0x0A1524)
 
@@ -114,6 +119,18 @@ extension View {
             .background(Theme.background.ignoresSafeArea())
     }
 
+    // A raised card: soft shadow, fine outline, smooth corners.
+    func premiumCard(padding: CGFloat = 16, radius: CGFloat = 20) -> some View {
+        self
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .strokeBorder(Theme.hairline, lineWidth: 0.75))
+            .shadow(color: .black.opacity(0.10), radius: 10, y: 4)
+            .padding(.vertical, 4)
+    }
+
     // Navy (or ivory) background for ScrollView screens.
     func themedScreen() -> some View {
         self.background(Theme.background.ignoresSafeArea())
@@ -137,7 +154,9 @@ struct BrandButtonStyle: ButtonStyle {
                     Capsule().fill(TintShapeStyle())
                 }
             }
-            .opacity(configuration.isPressed ? 0.8 : 1)
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .opacity(configuration.isPressed ? 0.85 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 
@@ -151,6 +170,29 @@ struct SoftButtonStyle: ButtonStyle {
             .padding(.vertical, 12)
             .background(Capsule().strokeBorder(Theme.hairline, lineWidth: 1.5))
             .opacity(configuration.isPressed ? 0.7 : 1)
+    }
+}
+
+// A circular progress ring with the percentage in the middle.
+struct ProgressRing: View {
+    let progress: Double
+    var lineWidth: CGFloat = 8
+
+    private var clamped: Double { min(max(progress, 0), 1) }
+
+    var body: some View {
+        ZStack {
+            Circle().stroke(Theme.hairline, lineWidth: lineWidth)
+            Circle()
+                .trim(from: 0, to: CGFloat(clamped))
+                .stroke(Theme.goldGradient, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            Text("\(Int((clamped * 100).rounded()))%")
+                .font(.display(.subheadline, weight: .bold))
+        }
+        .animation(.spring(response: 0.6, dampingFraction: 0.8), value: clamped)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(Int((clamped * 100).rounded())) percent done")
     }
 }
 

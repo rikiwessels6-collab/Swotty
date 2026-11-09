@@ -72,11 +72,7 @@ struct TodayCard: View {
                 .tint(.orange)
             }
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .padding(.vertical, 4)
+        .premiumCard()
         .onReceive(ticker) { now = $0 }
     }
 }
