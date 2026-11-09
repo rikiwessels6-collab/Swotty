@@ -9,6 +9,7 @@ struct PlannerView: View {
     @State private var subjectFilter: String? = nil   // nil means "All"
     @State private var showingAddSheet = false
     @State private var showingQuickAdd = false
+    @State private var searchText = ""
     @State private var editingItem: Assessment? = nil
     @State private var showCompleted = false
 
@@ -58,7 +59,10 @@ struct PlannerView: View {
     }
 
     private var visible: [Assessment] {
-        store.items.filter { subjectFilter == nil || $0.subjectID == subjectFilter }
+        store.items.filter {
+            (subjectFilter == nil || $0.subjectID == subjectFilter)
+                && $0.matches(search: searchText, subjectName: store.subject(for: $0).name)
+        }
     }
 
     private var overdue: [Assessment] {
@@ -207,6 +211,7 @@ struct PlannerView: View {
             }
             .listStyle(.insetGrouped)
             .themedList()
+            .searchable(text: $searchText, prompt: "Search assessments")
             .overlay(alignment: .bottomTrailing) {
                 Button {
                     Haptics.tap()
@@ -300,6 +305,14 @@ struct PlannerView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { editingItem = item }
+        .contextMenu {
+            Button {
+                store.add(item.duplicated())
+                Haptics.tap()
+            } label: {
+                Label("Duplicate", systemImage: "plus.square.on.square")
+            }
+        }
         .swipeActions(edge: .leading) {
             Button {
                 withAnimation { store.toggleCompleted(item) }

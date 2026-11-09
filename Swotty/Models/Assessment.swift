@@ -150,3 +150,35 @@ extension Assessment {
         return parts.joined(separator: ", ")
     }
 }
+
+extension Assessment {
+    // A fresh, unfinished copy (for repeating a similar task).
+    func duplicated() -> Assessment {
+        var copy = self
+        copy.id = UUID()
+        copy.title = title + " (copy)"
+        copy.isCompleted = false
+        copy.score = nil
+        copy.outOf = nil
+        copy.grade = nil
+        copy.studyMinutes = 0
+        copy.calendarEventID = nil
+        copy.isDemo = false
+        copy.steps = steps.map { step in
+            var fresh = step
+            fresh.id = UUID()
+            fresh.isDone = false
+            return fresh
+        }
+        return copy
+    }
+
+    // True if the text appears in the title, notes or subject name.
+    func matches(search text: String, subjectName: String) -> Bool {
+        let query = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if query.isEmpty { return true }
+        return title.localizedCaseInsensitiveContains(query)
+            || notes.localizedCaseInsensitiveContains(query)
+            || subjectName.localizedCaseInsensitiveContains(query)
+    }
+}

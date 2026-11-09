@@ -66,4 +66,30 @@ final class AssessmentTests: XCTestCase {
         XCTAssertTrue(a.accessibilitySummary(subjectName: "Maths").contains("completed"))
         XCTAssertTrue(a.accessibilitySummary(subjectName: "Maths").contains("scored 85 percent"))
     }
+
+    func testDuplicateIsFreshAndUnfinished() {
+        var a = make()
+        a.isCompleted = true
+        a.score = 5
+        a.outOf = 10
+        a.steps = [ChecklistStep(text: "a", isDone: true)]
+        let copy = a.duplicated()
+        XCTAssertNotEqual(copy.id, a.id)
+        XCTAssertEqual(copy.title, "Test (copy)")
+        XCTAssertFalse(copy.isCompleted)
+        XCTAssertNil(copy.score)
+        XCTAssertFalse(copy.steps[0].isDone)
+        XCTAssertNotEqual(copy.steps[0].id, a.steps[0].id)
+    }
+
+    func testSearchMatchesTitleNotesAndSubject() {
+        var a = make()
+        a.title = "Algebra test"
+        a.notes = "Chapter 4"
+        XCTAssertTrue(a.matches(search: "", subjectName: "Maths"))
+        XCTAssertTrue(a.matches(search: "algebra", subjectName: "Maths"))
+        XCTAssertTrue(a.matches(search: "chapter", subjectName: "Maths"))
+        XCTAssertTrue(a.matches(search: "math", subjectName: "Maths"))
+        XCTAssertFalse(a.matches(search: "history", subjectName: "Maths"))
+    }
 }
