@@ -9,9 +9,14 @@ struct AssessmentRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Button(action: onToggle) {
-                Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .font(.title2)
-                    .foregroundStyle(item.isCompleted ? Color.green : subject.color)
+                ZStack {
+                    Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
+                        .font(.title2)
+                        .foregroundStyle(item.isCompleted ? Color.green : subject.color)
+                        .id(item.isCompleted)
+                        .transition(.scale(scale: 0.4).combined(with: .opacity))
+                }
+                .animation(.spring(response: 0.35, dampingFraction: 0.55), value: item.isCompleted)
             }
             .buttonStyle(.borderless)
             .accessibilityLabel(item.isCompleted ? "Mark as not done" : "Mark as done")
@@ -75,7 +80,15 @@ struct AssessmentRow: View {
             }
             .accessibilityHidden(true)
         }
+        .padding(.leading, 10)
         .padding(.vertical, 4)
+        // Subject colour stripe: every entry reads at a glance.
+        .overlay(alignment: .leading) {
+            Capsule()
+                .fill(subject.color.opacity(item.isCompleted ? 0.35 : 1))
+                .frame(width: 4)
+                .padding(.vertical, 2)
+        }
     }
 }
 

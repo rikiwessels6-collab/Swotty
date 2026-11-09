@@ -134,14 +134,46 @@ struct MonthCalendarView: View {
                     }
                 }
             }
+            .id(month)
+            .transition(.opacity.combined(with: .scale(scale: 0.97)))
+
+            legend
         }
         .card()
+    }
+
+    // Which colour is which subject, for the subjects due this month.
+    private var legend: some View {
+        let ids = Set(store.items
+            .filter { calendar.isDate($0.dueDate, equalTo: month, toGranularity: .month) }
+            .map { $0.subjectID })
+        let used = store.subjects.filter { ids.contains($0.id) }
+        return Group {
+            if !used.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 14) {
+                        ForEach(used) { subject in
+                            HStack(spacing: 5) {
+                                Circle().fill(subject.color).frame(width: 8, height: 8)
+                                Text(subject.name)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
+            }
+        }
     }
 
     private func dayCell(_ day: Date) -> some View {
         let dayItems = items(on: day)
         let isSelected = calendar.isDate(day, inSameDayAs: selectedDay)
         let isToday = calendar.isDateInToday(day)
+        // The day takes the colour of its first unfinished entry.
+        let lead = dayItems.first { !$0.isCompleted } ?? dayItems.first
+        let tint: Color = lead.map { store.subject(for: $0).color } ?? Color.clear
 
         return Button {
             selectedDay = calendar.startOfDay(for: day)
@@ -153,6 +185,8 @@ struct MonthCalendarView: View {
                     .foregroundStyle(isSelected ? Theme.onAccent : (isToday ? accent.color : Color.primary))
                     .frame(width: 32, height: 32)
                     .background(Circle().fill(isSelected ? accent.color : Color.clear))
+                    .scaleEffect(isSelected ? 1.1 : 1)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
 
                 // Up to three coloured dots, one per assessment.
                 HStack(spacing: 3) {
@@ -165,6 +199,10 @@ struct MonthCalendarView: View {
                 .frame(height: 6)
             }
             .frame(maxWidth: .infinity, minHeight: 48)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(tint.opacity(isSelected ? 0 : 0.16))
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

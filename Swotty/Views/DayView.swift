@@ -99,6 +99,9 @@ struct DayView: View {
                     filterBanner
                 }
                 timeline
+                    .id(day)
+                    .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: 14)),
+                                            removal: .opacity))
                 if !dueToday.isEmpty {
                     dueCard
                 }

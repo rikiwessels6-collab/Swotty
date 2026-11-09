@@ -178,19 +178,27 @@ struct ProgressRing: View {
     let progress: Double
     var lineWidth: CGFloat = 8
 
+    // The ring fills up when it appears, then follows any change.
+    @State private var shown: Double = 0
+
     private var clamped: Double { min(max(progress, 0), 1) }
 
     var body: some View {
         ZStack {
             Circle().stroke(Theme.hairline, lineWidth: lineWidth)
             Circle()
-                .trim(from: 0, to: CGFloat(clamped))
+                .trim(from: 0, to: CGFloat(shown))
                 .stroke(Theme.goldGradient, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             Text("\(Int((clamped * 100).rounded()))%")
                 .font(.display(.subheadline, weight: .bold))
         }
-        .animation(.spring(response: 0.6, dampingFraction: 0.8), value: clamped)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.9)) { shown = clamped }
+        }
+        .onChange(of: clamped) { newValue in
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) { shown = newValue }
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(Int((clamped * 100).rounded())) percent done")
     }
