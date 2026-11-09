@@ -159,7 +159,10 @@ struct DayView: View {
                 let isSelected = calendar.isDate(date, inSameDayAs: day)
                 let isToday = calendar.isDateInToday(date)
                 Button {
-                    withAnimation { day = calendar.startOfDay(for: date) }
+                    Haptics.tap()
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        day = calendar.startOfDay(for: date)
+                    }
                 } label: {
                     VStack(spacing: 2) {
                         Text(date.formatted(.dateTime.weekday(.abbreviated)))
@@ -352,6 +355,11 @@ struct DayView: View {
         }
         .frame(minHeight: height, alignment: .top)
         .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(isNow ? subject.color.opacity(0.12) : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .animation(.easeInOut(duration: 0.3), value: isNow)
     }
 
     private var emptyDay: some View {
